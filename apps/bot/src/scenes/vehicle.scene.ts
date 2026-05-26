@@ -1,6 +1,5 @@
 import { UseGuards } from '@nestjs/common';
 import { Action, Ctx, On, Scene, SceneEnter } from 'nestjs-telegraf';
-import { Vehicle } from '@prisma/client';
 import { Markup } from 'telegraf';
 import { GroupMemberGuard } from '../guards/group-member.guard';
 import { mainMenuKeyboard } from '../keyboards/main-menu.keyboard';
@@ -231,20 +230,19 @@ export class VehicleScene {
     });
 
     const lines = vehicles.length
-      ? vehicles.map((vehicle: Vehicle, index: number) => {
-          const details = [vehicle.model, vehicle.color, vehicle.parkingSlot]
-            .filter(Boolean)
-            .join(', ');
-          return `${index + 1}. ${vehicle.number} - ${details || vehicle.type}`;
+      ? vehicles.map((v, i) => {
+          const details = [v.model, v.color, v.parkingSlot].filter(Boolean).join(', ');
+          return `${i + 1}. ${v.number} - ${details || v.type}`;
         })
       : ['No vehicles added yet.'];
+    const vehicleButtons = vehicles.map((v) => [
+      Markup.button.callback(v.number, `vehicles:select:${v.id}`),
+    ]);
 
     await ctx.reply(
       ['My Vehicles', '', ...lines].join('\n'),
       Markup.inlineKeyboard([
-        ...vehicles.map((vehicle: Vehicle) => [
-          Markup.button.callback(vehicle.number, `vehicles:select:${vehicle.id}`),
-        ]),
+        ...vehicleButtons,
         [Markup.button.callback('Add Vehicle', 'vehicles:add')],
         [Markup.button.callback('Back', 'menu:back')],
       ]),

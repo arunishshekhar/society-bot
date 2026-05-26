@@ -1,6 +1,5 @@
 import { UseGuards } from '@nestjs/common';
 import { Action, Ctx, On, Scene, SceneEnter } from 'nestjs-telegraf';
-import { CarpoolRoute } from '@prisma/client';
 import { Markup } from 'telegraf';
 import { GroupMemberGuard } from '../guards/group-member.guard';
 import { mainMenuKeyboard } from '../keyboards/main-menu.keyboard';
@@ -309,10 +308,13 @@ export class CarpoolScene {
     const resident = await this.getResident(ctx);
     if (!resident) return;
     const routes = await this.prisma.carpoolRoute.findMany({ where: { residentId: resident.id }, orderBy: { createdAt: 'desc' } });
+    const routeLines = routes.map((r, i) => `${i + 1}. ${r.destination} - ${r.departureTime} (${r.isPaused ? 'Paused' : 'Active'})`);
+    const routeButtons = routes.map((r) => [Markup.button.callback(`${r.destination} - ${r.departureTime}`, `carpool:select:${r.id}`)]);
+    const text = routes.length ? ['Your routes:', ...routeLines].join('\n') : 'You have not posted any carpool routes.';
     await ctx.reply(
-      routes.length ? ['Your routes:', ...routes.map((route: CarpoolRoute, index: number) => `${index + 1}. ${route.destination} - ${route.departureTime} (${route.isPaused ? 'Paused' : 'Active'})`)].join('\n') : 'You have not posted any carpool routes.',
+      text,
       Markup.inlineKeyboard([
-        ...routes.map((route: CarpoolRoute) => [Markup.button.callback(`${route.destination} - ${route.departureTime}`, `carpool:select:${route.id}`)]),
+        ...routeButtons,
         [Markup.button.callback('Post Route', 'carpool:create')],
         [Markup.button.callback('Back', 'carpool:home')],
       ]),

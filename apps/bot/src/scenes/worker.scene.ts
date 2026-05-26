@@ -1,6 +1,5 @@
 import { UseGuards } from '@nestjs/common';
 import { Action, Ctx, On, Scene, SceneEnter } from 'nestjs-telegraf';
-import { WorkerRecommendation } from '@prisma/client';
 import { Markup } from 'telegraf';
 import { GroupMemberGuard } from '../guards/group-member.guard';
 import { mainMenuKeyboard } from '../keyboards/main-menu.keyboard';
@@ -391,12 +390,15 @@ export class WorkerScene {
       orderBy: { createdAt: 'desc' },
     });
 
+    const workerLines = workers.map((w, i) => `${i + 1}. ${w.name} - ${this.title(w.category)}`);
+    const workerButtons = workers.map((w) => [Markup.button.callback(w.name, `workers:select:${w.id}`)]);
+    const text = workers.length
+      ? ['My Recommendations', '', ...workerLines].join('\n')
+      : 'You have not added any worker recommendations yet.';
     await ctx.reply(
-      workers.length
-        ? ['My Recommendations', '', ...workers.map((worker: WorkerRecommendation, index: number) => `${index + 1}. ${worker.name} - ${this.title(worker.category)}`)].join('\n')
-        : 'You have not added any worker recommendations yet.',
+      text,
       Markup.inlineKeyboard([
-        ...workers.map((worker: WorkerRecommendation) => [Markup.button.callback(worker.name, `workers:select:${worker.id}`)]),
+        ...workerButtons,
         [Markup.button.callback('Add Worker', 'workers:add')],
         [Markup.button.callback('Back', 'workers:home')],
       ]),
