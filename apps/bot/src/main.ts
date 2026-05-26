@@ -1,13 +1,18 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { getBotToken } from 'nestjs-telegraf';
+import { Telegraf } from 'telegraf';
 
+const HOOK_PATH = '/telegram-webhook';
 const RETRIES = 5;
 const RETRY_DELAY_MS = 8000;
 
 async function bootstrap() {
-  // If not using webhooks, delete any stale webhook so polling works correctly.
-  if (!process.env.WEBHOOK_DOMAIN) {
+  const webhookDomain = process.env.WEBHOOK_DOMAIN;
+
+  // In polling mode: clear any stale webhook so getUpdates works.
+  if (!webhookDomain) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (token) {
       try {
@@ -15,7 +20,7 @@ async function bootstrap() {
           `https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`,
         );
       } catch {
-        // Non-fatal — polling will still work; may miss some queued messages
+        // Non-fatal
       }
     }
   }
@@ -24,8 +29,20 @@ async function bootstrap() {
     try {
       const app = await NestFactory.create(AppModule);
       app.enableCors();
+
+      // In webhook mode, nestjs-telegraf's bot.launch() only registers the
+      // webhook URL with Telegram — it does NOT mount a route on the HTTP server.
+      // We must do that ourselves by wiring the Telegraf callback into Express.
+      if (webhookDomain) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const expressApp = app.getHttpAdapter().getInstance();
+        const bot: Telegraf = app.get(getBotToken());
+        expressApp.use(HOOK_PATH, bot.webhookCallback(HOOK_PATH));
+        console.log(`[webhook] Mounted Telegraf handler at ${HOOK_PATH}`);
+      }
+
       await app.listen(process.env.PORT ?? 3001);
-      console.log(`Bot started on attempt ${attempt}`);
+      console.log(`Bot started on attempt ${attempt} (mode: ${webhookDomain ? 'webhook' : 'polling'})`);
       return;
     } catch (err) {
       const isLast = attempt === RETRIES;
@@ -43,3 +60,4 @@ async function bootstrap() {
 }
 
 void bootstrap();
+
