@@ -1,4 +1,4 @@
-# Society Bot
+# POC: Society Bot
 
 A Telegram-based management system for housing societies. Residents interact entirely through a Telegram bot — no app install required. Admins manage everything through a lightweight web dashboard.
 
@@ -154,7 +154,7 @@ Render free tier sleeps after 15 minutes of inactivity. A sleeping bot misses Te
 
 Set up a free monitor on [UptimeRobot](https://uptimerobot.com):
 - Monitor type: HTTP(S)
-- URL: `https://your-render-url.onrender.com/health`
+- URL: `https://your-render-url.onrender.com/admin/health`
 - Interval: every 5 minutes
 
 Add a `/health` endpoint to your NestJS app:
