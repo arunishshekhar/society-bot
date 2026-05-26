@@ -1,5 +1,5 @@
 import { UseGuards } from '@nestjs/common';
-import { Action, Ctx, On, Scene, SceneEnter } from 'nestjs-telegraf';
+import { Action, Command, Ctx, On, Scene, SceneEnter } from 'nestjs-telegraf';
 import { Markup } from 'telegraf';
 import { GroupMemberGuard } from '../guards/group-member.guard';
 import { mainMenuKeyboard } from '../keyboards/main-menu.keyboard';
@@ -26,6 +26,14 @@ export class SearchScene {
     await ctx.answerCbQuery();
     await ctx.scene.leave();
     await ctx.reply('Society Bot', mainMenuKeyboard());
+  }
+
+  @Command('ask')
+  async onAskCommand(@Ctx() ctx: BotContext) {
+    const text = (ctx.message as { text?: string })?.text ?? '';
+    const query = text.replace(/^\/ask\s*/i, '').trim();
+    await ctx.scene.leave();
+    await this.searchService.handleAsk(ctx, query);
   }
 
   @On('text')

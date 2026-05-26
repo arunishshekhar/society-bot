@@ -1,4 +1,4 @@
-# POC: Society Bot
+# Society Bot
 
 A Telegram-based management system for housing societies. Residents interact entirely through a Telegram bot — no app install required. Admins manage everything through a lightweight web dashboard.
 
@@ -6,14 +6,14 @@ A Telegram-based management system for housing societies. Residents interact ent
 
 ## Features
 
-- **Resident Onboarding** — Register via Telegram, modular editable profiles, no re-onboarding ever
-- **Vehicle Registry** — Register vehicles, admin vehicle lookup by plate number
-- **Worker Recommendations** — Add and discover plumbers, electricians, maids and more
+- **Resident Onboarding** — Register via Telegram, step-by-step with resume support (restart anytime without losing progress)
+- **Vehicle Registry** — Register vehicles linked to resident profile; admin vehicle lookup by plate number
+- **Worker Recommendations** — Add and discover plumbers, electricians, maids and more; rated by residents
 - **Micro-Services Directory** — List and browse resident-run home businesses (tiffin, tutoring, laundry)
-- **Carpool Matching** — Post and find commute routes by destination and timing
-- **AI Search** — Natural language search across workers, services, and carpools via Groq
+- **Carpool Matching** — Post and find commute routes by destination, days, and timing
+- **AI Search (`/ask`)** — Natural language search across workers, services, and carpools via Groq (llama-3.1-8b-instant); falls back to keyword search if Groq is unavailable
 - **Admin Dashboard** — Manage residents, moderate content, broadcast announcements, view analytics
-- **Access Control** — Telegram group membership as single source of truth, no manual verification
+- **Access Control** — Telegram group membership as single source of truth; no manual verification
 
 ---
 
@@ -21,13 +21,13 @@ A Telegram-based management system for housing societies. Residents interact ent
 
 | Layer | Technology |
 |---|---|
-| Bot | NestJS + nestjs-telegraf |
-| Backend | NestJS (monolith) |
-| Database | PostgreSQL (Neon) + Prisma |
-| Admin UI | Next.js + Tailwind CSS |
+| Bot runtime | NestJS + nestjs-telegraf |
+| Database | PostgreSQL (Neon) + Prisma ORM |
 | AI | Groq API (llama-3.1-8b-instant) |
-| Backend Hosting | Render |
-| Frontend Hosting | Vercel |
+| Admin UI | Next.js 15 (App Router) + Tailwind CSS |
+| Backend hosting | Render (webhook mode) |
+| Frontend hosting | Vercel |
+| Package manager | pnpm (monorepo) |
 
 ---
 
@@ -36,35 +36,74 @@ A Telegram-based management system for housing societies. Residents interact ent
 ```
 society-bot/
 ├── apps/
-│   ├── bot/                   # NestJS — Telegram bot + REST API
+│   ├── bot/                        # NestJS — Telegram bot + REST admin API
 │   │   ├── src/
+│   │   │   ├── app.module.ts
+│   │   │   ├── app.update.ts       # Top-level bot command handlers (/start, /menu, /ask)
+│   │   │   ├── main.ts             # Bootstrap: webhook mounting, BigInt patch, retry logic
 │   │   │   ├── modules/
-│   │   │   │   ├── auth/
-│   │   │   │   ├── users/
-│   │   │   │   ├── onboarding/
-│   │   │   │   ├── vehicles/
-│   │   │   │   ├── workers/
-│   │   │   │   ├── microservices/
-│   │   │   │   ├── carpool/
-│   │   │   │   ├── search/
-│   │   │   │   ├── notifications/
-│   │   │   │   └── admin/
-│   │   │   ├── scenes/
+│   │   │   │   ├── search/         # Groq intent classifier + fallback keyword search
+│   │   │   │   └── admin/          # REST API for dashboard (guarded by API key)
+│   │   │   ├── scenes/             # Telegraf FSM scenes (one per feature)
+│   │   │   │   ├── onboarding.scene.ts
+│   │   │   │   ├── profile.scene.ts
+│   │   │   │   ├── vehicles.scene.ts
+│   │   │   │   ├── workers.scene.ts
+│   │   │   │   ├── microservices.scene.ts
+│   │   │   │   ├── carpool.scene.ts
+│   │   │   │   ├── search.scene.ts
+│   │   │   │   └── settings.scene.ts
 │   │   │   ├── guards/
-│   │   │   └── prisma/
+│   │   │   │   ├── group-member.guard.ts   # Telegram group membership check
+│   │   │   │   └── admin-api-key.guard.ts  # x-admin-api-key header check
+│   │   │   ├── keyboards/
+│   │   │   ├── prisma/
+│   │   │   └── sessions/
 │   │   └── prisma/
-│   │       └── schema.prisma
-│   └── dashboard/             # Next.js admin dashboard
+│   │       ├── schema.prisma
+│   │       └── migrations/
+│   └── dashboard/                  # Next.js admin dashboard
 │       └── app/
+│           ├── lib/admin-api.ts    # Server-side fetch wrapper (uses ADMIN_API_URL + ADMIN_API_KEY)
+│           ├── actions/admin.ts    # Next.js server actions for CRUD
 │           ├── residents/
-│           ├── vehicles/
 │           ├── workers/
 │           ├── services/
 │           ├── carpool/
 │           ├── broadcast/
-│           └── analytics/
-└── package.json
+│           ├── analytics/
+│           └── api/
+│               ├── login/          # Sets admin-session cookie
+│               └── broadcast/      # Proxies broadcast to bot backend
+├── render.yaml                     # Render deployment config (build + start commands)
+└── package.json                    # Root pnpm workspace scripts
 ```
+
+---
+
+## Bot Commands
+
+| Command | Description |
+|---|---|
+| `/start` | Onboard new residents or show main menu if already registered |
+| `/menu` | Show main menu |
+| `/ask <query>` | AI-powered natural language search across workers, services, and carpools |
+
+### `/ask` Examples
+
+```
+/ask I need a North Indian maid
+/ask carpool to MG Road on Monday around 8AM
+/ask plumber for bathroom leak
+/ask someone who does tiffin service
+```
+
+The AI (Groq) extracts structured intent from the query, then filters the database directly:
+- **Workers**: matches `category`, `notes`, `tags`, `name`
+- **Services**: matches `name`, `description`, `category`
+- **Carpool**: matches `destination` (ILIKE), `days` (array contains)
+
+Falls back to keyword regex matching if Groq is unavailable.
 
 ---
 
@@ -74,34 +113,36 @@ society-bot/
 
 - Node.js 20+
 - pnpm
-- PostgreSQL (local or Neon)
-- Telegram bot token from @BotFather
+- A Telegram bot token from [@BotFather](https://t.me/botfather)
+- PostgreSQL (local or [Neon](https://neon.tech) free tier)
 
 ### Setup
 
 ```bash
-# Clone the repo
 git clone https://github.com/yourusername/society-bot.git
 cd society-bot
 
-# Install dependencies
 pnpm install
 
-# Set up environment variables
+# Bot environment
 cp apps/bot/.env.example apps/bot/.env
-cp apps/dashboard/.env.example apps/dashboard/.env
-# Fill in values — see Environment Variables section below
+# Fill in values (see Environment Variables below)
+
+# Dashboard environment
+cp apps/dashboard/.env.example apps/dashboard/.env.local
+# Fill in values
 
 # Run database migrations
-cd apps/bot
-npx prisma migrate dev
+cd apps/bot && npx prisma migrate dev && cd ../..
 
-# Start bot (development)
-pnpm --filter bot start:dev
+# Start bot in development (polling mode — leave WEBHOOK_DOMAIN empty)
+pnpm dev:bot
 
-# Start dashboard (development)
-pnpm --filter dashboard dev
+# Start dashboard in development
+pnpm dev:dashboard
 ```
+
+> **Local vs Production mode**: When `WEBHOOK_DOMAIN` is empty, the bot runs in polling mode (good for local dev). When `WEBHOOK_DOMAIN` is set, it runs in webhook mode (required on Render).
 
 ---
 
@@ -110,21 +151,23 @@ pnpm --filter dashboard dev
 ### `apps/bot/.env`
 
 ```env
-DATABASE_URL=""           # Neon PostgreSQL connection string
-TELEGRAM_BOT_TOKEN=""     # From @BotFather
-TELEGRAM_GROUP_ID=""      # Numeric group ID (negative number)
-WEBHOOK_DOMAIN=""         # Your Render URL e.g. https://society-bot.onrender.com
-ADMIN_TELEGRAM_IDS=""     # Comma-separated admin Telegram user IDs
-ADMIN_API_KEY=""          # Random secret — run: openssl rand -hex 32
-GROQ_API_KEY=""           # From console.groq.com (free)
+DATABASE_URL=""                  # Neon PostgreSQL connection string
+TELEGRAM_BOT_TOKEN=""            # From @BotFather
+TELEGRAM_GROUP_ID=""             # Numeric group ID (negative number, e.g. -1001234567890)
+TELEGRAM_GROUP_INVITE_LINK=""    # https://t.me/+xxxxxxx
+WEBHOOK_DOMAIN=""                # Production Render URL (leave empty for local polling)
+ADMIN_TELEGRAM_IDS=""            # Comma-separated Telegram user IDs for admin access
+ADMIN_API_KEY=""                 # Random secret: openssl rand -hex 32
+ADMIN_PASSWORD=""                # Dashboard login password
+GROQ_API_KEY=""                  # From console.groq.com (free tier available)
 ```
 
-### `apps/dashboard/.env`
+### `apps/dashboard/.env.local`
 
 ```env
-NEXT_PUBLIC_API_URL=""    # Your Render backend URL
-ADMIN_API_KEY=""          # Same as backend
-ADMIN_PASSWORD=""         # Dashboard login password
+ADMIN_API_URL=""     # Bot backend URL (http://localhost:3001 locally, Render URL in production)
+ADMIN_API_KEY=""     # Must match ADMIN_API_KEY in apps/bot/.env
+ADMIN_PASSWORD=""    # Dashboard login password (must match bot ADMIN_PASSWORD)
 ```
 
 ---
@@ -133,59 +176,69 @@ ADMIN_PASSWORD=""         # Dashboard login password
 
 ### Backend → Render
 
-1. Create a new Web Service on [render.com](https://render.com)
-2. Connect this GitHub repo
-3. Set root directory: `apps/bot`
-4. Build command: `pnpm install && pnpm build && npx prisma migrate deploy`
-5. Start command: `node dist/main.js`
-6. Add all `apps/bot` env vars in Render dashboard
-7. After first deploy, copy the Render URL into `WEBHOOK_DOMAIN` and redeploy
+The repo includes `render.yaml` which configures the build automatically. When connecting to Render:
+
+1. Create a new **Web Service** on [render.com](https://render.com)
+2. Connect this GitHub repo — Render will detect `render.yaml`
+3. Add all environment variables from `apps/bot/.env` in the Render dashboard (Environment tab)
+4. After first deploy, set `WEBHOOK_DOMAIN` to your Render URL (e.g. `https://society-bot-xxxx.onrender.com`) and redeploy
+
+**Build command** (from `render.yaml`):
+```
+pnpm install --frozen-lockfile && pnpm build:bot
+```
+
+**Start command**:
+```
+pnpm start:bot
+```
+This runs `prisma migrate deploy && node dist/main.js`.
 
 ### Frontend → Vercel
 
-1. Import this repo on [vercel.com](https://vercel.com)
-2. Set root directory: `apps/dashboard`
-3. Add `apps/dashboard` env vars in Vercel dashboard
+1. Import the repo on [vercel.com](https://vercel.com)
+2. Set **Root Directory** to `apps/dashboard`
+3. Add environment variables in Vercel → Settings → Environment Variables:
+   - `ADMIN_API_URL` = your Render backend URL (no trailing slash)
+   - `ADMIN_API_KEY` = same value as the bot's `ADMIN_API_KEY` on Render
+   - `ADMIN_PASSWORD` = dashboard login password
 4. Deploy
 
-### Keep-alive (Required for Render free tier)
+> ⚠️ **Vercel does not auto-redeploy when env vars change.** Always manually trigger a redeploy after updating environment variables: Deployments → ⋯ → Redeploy.
 
-Render free tier sleeps after 15 minutes of inactivity. A sleeping bot misses Telegram webhooks.
+### Keep-Alive (Render Free Tier)
+
+Render's free tier sleeps after 15 minutes of inactivity. A sleeping bot misses Telegram webhooks.
 
 Set up a free monitor on [UptimeRobot](https://uptimerobot.com):
 - Monitor type: HTTP(S)
-- URL: `https://your-render-url.onrender.com/admin/health`
+- URL: `https://your-render-url.onrender.com/health`
 - Interval: every 5 minutes
-
-Add a `/health` endpoint to your NestJS app:
-```typescript
-@Get('health')
-health() {
-  return { status: 'ok' };
-}
-```
 
 ---
 
-## Branch Strategy
+## Admin Dashboard
 
-```
-main        → production (auto-deploys to Render + Vercel)
-dev         → active development
-feature/*   → individual features
-```
+Accessible at your Vercel URL. Protected by a password set via `ADMIN_PASSWORD`.
 
-Never push directly to `main`. Work on `dev`, merge when stable.
+| Page | Description |
+|---|---|
+| Vehicle Lookup | Search any registered vehicle by plate number |
+| Residents | View, edit, disable/enable, delete residents |
+| Workers | View, add, edit, ban/unban worker entries |
+| Services | View, add, edit, disable micro-services |
+| Carpool | View and manage carpool routes |
+| Broadcast | Send a message to all active residents via the bot |
+| Analytics | Overview stats (residents, services, carpools, workers) |
 
 ---
 
 ## Access Control
 
-Access is controlled entirely by Telegram group membership. There is no manual approval process.
+Access is controlled by Telegram group membership. There is no manual approval process.
 
-- Resident joins society Telegram group → can use the bot
-- Resident leaves or is removed from group → bot access revoked automatically
-- No offboarding flow needed
+- Resident joins the society Telegram group → can use the bot
+- Resident leaves or is removed from the group → bot access revoked automatically on next interaction
 
 ---
 

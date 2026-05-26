@@ -11,7 +11,7 @@ function createContext(overrides: Partial<BotContext> = {}) {
 
 describe('OnboardingScene', () => {
   it('resumes from the saved flat-number step', async () => {
-    const scene = new OnboardingScene({} as never);
+    const scene = new OnboardingScene({} as never, {} as never);
     const ctx = createContext({
       session: { onboarding: { step: 'flat', name: 'Arunish' } },
     } as Partial<BotContext>);
@@ -22,7 +22,7 @@ describe('OnboardingScene', () => {
   });
 
   it('validates flat number input and preserves the current step on failure', async () => {
-    const scene = new OnboardingScene({} as never);
+    const scene = new OnboardingScene({} as never, {} as never);
     const ctx = createContext({
       text: 'Tower A',
       session: { onboarding: { step: 'flat', name: 'Arunish' } },
@@ -35,7 +35,7 @@ describe('OnboardingScene', () => {
   });
 
   it('normalizes a valid flat number and moves to phone capture', async () => {
-    const scene = new OnboardingScene({} as never);
+    const scene = new OnboardingScene({} as never, {} as never);
     const ctx = createContext({
       text: 'a-101',
       session: { onboarding: { step: 'flat', name: 'Arunish' } },

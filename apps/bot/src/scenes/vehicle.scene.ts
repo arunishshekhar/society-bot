@@ -1,8 +1,9 @@
 import { UseGuards } from '@nestjs/common';
-import { Action, Ctx, On, Scene, SceneEnter } from 'nestjs-telegraf';
+import { Action, Command, Ctx, On, Scene, SceneEnter } from 'nestjs-telegraf';
 import { Markup } from 'telegraf';
 import { GroupMemberGuard } from '../guards/group-member.guard';
 import { mainMenuKeyboard } from '../keyboards/main-menu.keyboard';
+import { SearchService } from '../modules/search/search.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BotContext } from '../types/bot-context';
 import { getCallbackData } from '../utils/callback-data';
@@ -11,7 +12,10 @@ import { isValidVehicleNumber, normalizeVehicleNumber } from '../utils/validatio
 @Scene('vehicles')
 @UseGuards(GroupMemberGuard)
 export class VehicleScene {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly searchService: SearchService,
+  ) {}
 
   @SceneEnter()
   async enter(@Ctx() ctx: BotContext) {
@@ -137,6 +141,14 @@ export class VehicleScene {
   async skipParking(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
     await this.saveVehicleDraft(ctx);
+  }
+
+  @Command('ask')
+  async onAskCommand(@Ctx() ctx: BotContext) {
+    const text = (ctx.message as { text?: string })?.text ?? '';
+    const query = text.replace(/^\/ask\s*/i, '').trim();
+    await ctx.scene.leave();
+    await this.searchService.handleAsk(ctx, query);
   }
 
   @On('text')
