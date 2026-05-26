@@ -23,11 +23,7 @@ export class AdminController {
 		@InjectBot() private readonly bot: Telegraf<BotContext>,
 	) {}
 
-	@Get("health")
-	health() {
-		return { status: "ok" };
-	}
-	@Get("residents")
+	@Get('residents')
 	residents(@Query("search") search?: string) {
 		return this.admin.residents(search);
 	}

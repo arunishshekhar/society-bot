@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TelegrafModule } from 'nestjs-telegraf';
 import { AppUpdate } from './app.update';
 import { GroupMemberGuard } from './guards/group-member.guard';
+import { HealthController } from './health.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaService } from './prisma/prisma.service';
 import { createPrismaSessionMiddleware } from './sessions/prisma-session.middleware';
@@ -32,6 +33,7 @@ import { AdminModule } from './modules/admin/admin.module';
       }),
     }),
   ],
+  controllers: [HealthController],
   providers: [AppUpdate, GroupMemberGuard, ...scenes],
 })
 export class AppModule {}
