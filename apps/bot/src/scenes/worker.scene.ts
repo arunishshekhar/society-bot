@@ -92,7 +92,7 @@ export class WorkerScene {
     if (!worker || worker.isBanned || !worker.isActive) return;
 
     await ctx.reply(
-      [`${worker.name}`, `Phone: ${worker.phone}`, `Added by: ${worker.resident.flatNumber}`].join('\n'),
+      [`${worker.name}`, `Phone: ${worker.phone}`, `Added by: ${worker.resident?.flatNumber ?? 'Admin'}`].join('\n'),
     );
   }
 
@@ -360,11 +360,11 @@ export class WorkerScene {
     );
   }
 
-  private async showWorkerCard(ctx: BotContext, worker: { id: string; name: string; phone: string; category: string; rating: number | null; notes: string | null; resident: { flatNumber: string } }) {
+  private async showWorkerCard(ctx: BotContext, worker: { id: string; name: string; phone: string; category: string; rating: number | null; notes: string | null; resident: { flatNumber: string } | null }) {
     await ctx.reply(
       [
         `${worker.name} - ${this.title(worker.category)}`,
-        `Rating: ${worker.rating ?? 'Not rated'} | Added by: ${worker.resident.flatNumber}`,
+        `Rating: ${worker.rating ?? 'Not rated'} | Added by: ${worker.resident?.flatNumber ?? 'Admin'}`,
         worker.notes ? `Notes: ${worker.notes}` : undefined,
       ]
         .filter(Boolean)

@@ -219,12 +219,14 @@ export class MicroServiceScene {
     const metadata = readServiceMetadata(service.metadata);
     const contact =
       metadata.contactPreference === 'phone'
-        ? service.resident.phone ?? 'Phone not available'
-        : service.resident.telegramUsername
+        ? service.resident?.phone ?? 'Phone not available'
+        : service.resident?.telegramUsername
           ? `@${service.resident.telegramUsername}`
-          : `Telegram ID: ${service.resident.telegramId.toString()}`;
+          : service.resident
+            ? `Telegram ID: ${service.resident.telegramId.toString()}`
+            : 'Contact via admin';
 
-    await ctx.reply([service.name, `Flat: ${service.resident.flatNumber}`, `Contact: ${contact}`].join('\n'));
+    await ctx.reply([service.name, `Flat: ${service.resident?.flatNumber ?? 'Admin'}`, `Contact: ${contact}`].join('\n'));
   }
 
   @Action('services:home')
@@ -372,7 +374,6 @@ export class MicroServiceScene {
       where: {
         isPaused: false,
         isDisabled: false,
-        resident: { isActive: true },
         ...(category === 'all' ? {} : { category }),
       },
       include: { resident: true },
@@ -390,7 +391,7 @@ export class MicroServiceScene {
       await ctx.reply(
         [
           service.name,
-          `${this.title(service.category)} | ${service.resident.flatNumber}`,
+          `${this.title(service.category)} | ${service.resident?.flatNumber ?? 'Admin'}`,
           metadata.timing,
           service.description,
         ]

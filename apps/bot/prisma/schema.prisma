@@ -33,37 +33,37 @@ model Vehicle {
   model       String?
   parkingSlot String?
   createdAt   DateTime @default(now())
-  resident    Resident @relation(fields: [residentId], references: [id])
+  resident    Resident @relation(fields: [residentId], references: [id], onDelete: Cascade)
 }
 
 model WorkerRecommendation {
-  id          String   @id @default(uuid())
-  residentId  String
+  id          String    @id @default(uuid())
+  residentId  String?
   name        String
   phone       String
   category    String
   tags        String[]
   rating      Int?
   notes       String?
-  isActive    Boolean  @default(true)
-  isBanned    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  resident    Resident @relation(fields: [residentId], references: [id])
+  isActive    Boolean   @default(true)
+  isBanned    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  resident    Resident? @relation(fields: [residentId], references: [id], onDelete: SetNull)
 }
 
 model MicroService {
-  id          String   @id @default(uuid())
-  residentId  String   @unique
+  id          String    @id @default(uuid())
+  residentId  String?   @unique
   name        String
   category    String
   description String?
-  isPaused    Boolean  @default(false)
-  isDisabled  Boolean  @default(false)
+  isPaused    Boolean   @default(false)
+  isDisabled  Boolean   @default(false)
   metadata    Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  resident    Resident @relation(fields: [residentId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  resident    Resident? @relation(fields: [residentId], references: [id], onDelete: SetNull)
 }
 
 model CarpoolRoute {
@@ -78,14 +78,23 @@ model CarpoolRoute {
   isPaused       Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  resident       Resident @relation(fields: [residentId], references: [id])
+  resident       Resident @relation(fields: [residentId], references: [id], onDelete: Cascade)
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String
+  type      String   // 'worker' | 'service'
+  createdAt DateTime @default(now())
+
+  @@unique([name, type])
 }
 
 model BotSession {
-  id          String    @id @default(uuid())
+  id          String   @id @default(uuid())
   telegramId  BigInt
   sessionData Json
-  updatedAt   DateTime  @updatedAt
+  updatedAt   DateTime @updatedAt
 
   @@unique([telegramId])
 }

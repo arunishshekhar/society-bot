@@ -60,7 +60,7 @@ export class SearchScene {
     });
     if (!workers.length) return this.empty(ctx);
     for (const worker of workers) {
-      await ctx.reply(`${worker.name} - ${worker.category}\nAdded by: ${worker.resident.flatNumber}\n${worker.notes ?? ''}`);
+      await ctx.reply(`${worker.name} - ${worker.category}\nAdded by: ${worker.resident?.flatNumber ?? 'Admin'}\n${worker.notes ?? ''}`);
     }
   }
 
@@ -80,7 +80,7 @@ export class SearchScene {
     });
     if (!services.length) return this.empty(ctx);
     for (const service of services) {
-      await ctx.reply(`${service.name} - ${service.category}\nFlat: ${service.resident.flatNumber}\n${service.description ?? ''}`);
+      await ctx.reply(`${service.name} - ${service.category}\nFlat: ${service.resident?.flatNumber ?? 'Admin'}\n${service.description ?? ''}`);
     }
   }
 
