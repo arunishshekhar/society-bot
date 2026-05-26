@@ -4,6 +4,13 @@ import { AppModule } from './app.module';
 import { getBotToken } from 'nestjs-telegraf';
 import { Telegraf } from 'telegraf';
 
+// BigInt (telegramId) can't be serialized by JSON.stringify by default.
+// Patch it globally so admin API responses don't 500.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 const HOOK_PATH = '/telegram-webhook';
 const RETRIES = 5;
 const RETRY_DELAY_MS = 8000;
