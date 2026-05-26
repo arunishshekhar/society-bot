@@ -7,6 +7,7 @@ import {
   createCategoryAction,
   deleteCategoryAction,
 } from '../actions/admin';
+import { SubmitButton } from '../components/submit-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,7 +47,7 @@ export default async function ServicesPage({
           <form action={createCategoryAction} className="flex gap-2">
             <input type="hidden" name="type" value="service" />
             <input name="name" placeholder="New category name" required className="flex-1 rounded border border-zinc-300 px-3 py-2 text-sm" />
-            <button type="submit" className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Add</button>
+            <SubmitButton className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Add</SubmitButton>
             <a href="/services" className="rounded border border-zinc-300 px-4 py-2 text-sm">Close</a>
           </form>
           {categoryList.length > 0 && (
@@ -57,7 +58,7 @@ export default async function ServicesPage({
                   <form action={deleteCategoryAction}>
                     <input type="hidden" name="id" value={String(c.id)} />
                     <input type="hidden" name="type" value="service" />
-                    <button type="submit" className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                    <SubmitButton className="text-xs text-red-500 hover:text-red-700">Remove</SubmitButton>
                   </form>
                 </li>
               ))}
@@ -82,7 +83,7 @@ export default async function ServicesPage({
             </select>
             <textarea name="description" placeholder="Description" className="rounded border border-zinc-300 px-3 py-2 text-sm sm:col-span-2" rows={2} />
             <div className="flex gap-2 sm:col-span-2">
-              <button type="submit" className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Save</button>
+              <SubmitButton className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Save</SubmitButton>
               <a href="/services" className="rounded border border-zinc-300 px-4 py-2 text-sm">Cancel</a>
             </div>
           </form>
@@ -122,13 +123,13 @@ export default async function ServicesPage({
                       <form action={toggleServiceAction}>
                         <input type="hidden" name="id" value={String(s.id)} />
                         <input type="hidden" name="isDisabled" value={String(!s.isDisabled)} />
-                        <button type="submit" className={`rounded border px-2 py-1 text-xs ${s.isDisabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                        <SubmitButton className={`rounded border px-2 py-1 text-xs ${s.isDisabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
                           {s.isDisabled ? 'Enable' : 'Disable'}
-                        </button>
+                        </SubmitButton>
                       </form>
                       <form action={deleteServiceAction}>
                         <input type="hidden" name="id" value={String(s.id)} />
-                        <button type="submit" className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-600 hover:bg-red-100">Del</button>
+                        <SubmitButton className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-600 hover:bg-red-100">Del</SubmitButton>
                       </form>
                     </div>
                   </td>
@@ -144,7 +145,7 @@ export default async function ServicesPage({
                         </select>
                         <textarea name="description" defaultValue={String(s.description ?? '')} placeholder="Description" className="rounded border border-zinc-300 px-3 py-2 text-sm sm:col-span-2" rows={2} />
                         <div className="flex gap-2 sm:col-span-2">
-                          <button type="submit" className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Save</button>
+                          <SubmitButton className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Save</SubmitButton>
                           <a href="/services" className="rounded border border-zinc-300 px-4 py-2 text-sm">Cancel</a>
                         </div>
                       </form>

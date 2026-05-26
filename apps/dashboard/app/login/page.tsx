@@ -1,3 +1,5 @@
+import { SubmitButton } from '../components/submit-button';
+
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
   return (
@@ -11,9 +13,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           className="mt-5 w-full rounded border border-zinc-300 px-3 py-2 text-sm"
         />
         {error ? <p className="mt-3 text-sm text-red-600">Invalid password.</p> : null}
-        <button className="mt-5 w-full rounded bg-zinc-950 px-3 py-2 text-sm font-medium text-white">
+        <SubmitButton className="mt-5 w-full bg-zinc-950 text-white">
           Sign in
-        </button>
+        </SubmitButton>
       </form>
     </main>
   );

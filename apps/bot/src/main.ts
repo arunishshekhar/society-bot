@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { getBotToken } from 'nestjs-telegraf';
 import { Telegraf } from 'telegraf';
+import { json, urlencoded } from 'express';
 
 // BigInt (telegramId) can't be serialized by JSON.stringify by default.
 // Patch it globally so admin API responses don't 500.
@@ -36,6 +37,8 @@ async function bootstrap() {
     try {
       const app = await NestFactory.create(AppModule);
       app.enableCors();
+      app.use(json({ limit: '20mb' }));
+      app.use(urlencoded({ extended: true, limit: '20mb' }));
 
       // In webhook mode, nestjs-telegraf's bot.launch() only registers the
       // webhook URL with Telegram — it does NOT mount a route on the HTTP server.

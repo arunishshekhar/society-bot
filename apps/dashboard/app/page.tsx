@@ -1,3 +1,4 @@
+import { SubmitButton } from './components/submit-button';
 import { adminFetch, AdminRecord, text } from './lib/admin-api';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
       <h1 className="text-2xl font-semibold">Vehicle Lookup</h1>
       <form className="mt-5 flex max-w-xl gap-2">
         <input name="plate" defaultValue={plate} placeholder="KA01AB1234" className="flex-1 rounded border border-zinc-300 px-3 py-2 text-sm" />
-        <button className="rounded bg-zinc-950 px-4 py-2 text-sm font-medium text-white">Search</button>
+        <SubmitButton className="rounded bg-zinc-950 px-4 py-2 text-sm font-medium text-white">Search</SubmitButton>
       </form>
       {plate && !vehicle ? <p className="mt-6 text-sm text-zinc-600">No vehicle found.</p> : null}
       {vehicle ? (

@@ -1,3 +1,4 @@
+import { SubmitButton } from '../components/submit-button';
 import { adminFetch, AdminRecord, text } from '../lib/admin-api';
 import { updateResidentAction } from '../actions/admin';
 import { DeleteButton } from './delete-button';
@@ -18,7 +19,7 @@ export default async function ResidentsPage({
       <h1 className="text-2xl font-semibold">Residents</h1>
       <form className="mt-5 flex gap-2">
         <input name="search" defaultValue={search} placeholder="Search name or flat" className="w-full max-w-md rounded border border-zinc-300 px-3 py-2 text-sm" />
-        <button className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Search</button>
+        <SubmitButton className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Search</SubmitButton>
       </form>
 
       <table className="mt-6 w-full border-collapse text-sm">
@@ -64,7 +65,7 @@ export default async function ResidentsPage({
                         <option value="true">Active</option>
                         <option value="false">Disabled</option>
                       </select>
-                      <button type="submit" className="rounded bg-zinc-900 px-4 py-1.5 text-sm text-white">Save</button>
+                      <SubmitButton className="rounded bg-zinc-900 px-4 py-1.5 text-sm text-white">Save</SubmitButton>
                       <a href="/residents" className="rounded border border-zinc-300 px-4 py-1.5 text-sm">Cancel</a>
                     </form>
                   </td>

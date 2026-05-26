@@ -1,3 +1,5 @@
+import { SubmitButton } from '../components/submit-button';
+
 export default async function BroadcastPage({ searchParams }: { searchParams: Promise<{ sent?: string; error?: string }> }) {
   const { sent, error } = await searchParams;
   return (
@@ -12,7 +14,7 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
         </div>
         {sent ? <p className="mt-4 text-sm text-green-700">Sent to {sent} residents.</p> : null}
         {error ? <p className="mt-4 text-sm text-red-600">Broadcast could not be sent.</p> : null}
-        <button className="mt-4 rounded bg-zinc-950 px-4 py-2 text-sm font-medium text-white">Send to active residents</button>
+        <SubmitButton className="mt-4 bg-zinc-950 text-white">Send to active residents</SubmitButton>
       </form>
     </main>
   );

@@ -1,3 +1,4 @@
+import { SubmitButton } from "../components/submit-button";
 import { adminFetch, AdminRecord, text } from '../lib/admin-api';
 import {
   createWorkerAction,
@@ -47,7 +48,7 @@ export default async function WorkersPage({
           <form action={createCategoryAction} className="flex gap-2">
             <input type="hidden" name="type" value="worker" />
             <input name="name" placeholder="New category name" required className="flex-1 rounded border border-zinc-300 px-3 py-2 text-sm" />
-            <button type="submit" className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Add</button>
+            <SubmitButton className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Add</SubmitButton>
             <a href="/workers" className="rounded border border-zinc-300 px-4 py-2 text-sm">Close</a>
           </form>
           {categoryList.length > 0 && (
@@ -58,7 +59,7 @@ export default async function WorkersPage({
                   <form action={deleteCategoryAction}>
                     <input type="hidden" name="id" value={String(c.id)} />
                     <input type="hidden" name="type" value="worker" />
-                    <button type="submit" className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                    <SubmitButton className="text-xs text-red-500 hover:text-red-700">Remove</SubmitButton>
                   </form>
                 </li>
               ))}
@@ -83,7 +84,7 @@ export default async function WorkersPage({
             </select>
             <textarea name="notes" placeholder="Notes" className="rounded border border-zinc-300 px-3 py-2 text-sm sm:col-span-2" rows={2} />
             <div className="flex gap-2 sm:col-span-2">
-              <button type="submit" className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Save</button>
+              <SubmitButton className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Save</SubmitButton>
               <a href="/workers" className="rounded border border-zinc-300 px-4 py-2 text-sm">Cancel</a>
             </div>
           </form>
@@ -125,13 +126,13 @@ export default async function WorkersPage({
                     <form action={banWorkerAction}>
                       <input type="hidden" name="id" value={String(w.id)} />
                       <input type="hidden" name="unban" value={String(!!w.isBanned)} />
-                      <button type="submit" className={`rounded border px-2 py-1 text-xs ${w.isBanned ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                      <SubmitButton className={`rounded border px-2 py-1 text-xs ${w.isBanned ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
                         {w.isBanned ? 'Unban' : 'Ban'}
-                      </button>
+                      </SubmitButton>
                     </form>
                     <form action={deleteWorkerAction}>
                       <input type="hidden" name="id" value={String(w.id)} />
-                      <button type="submit" className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-600 hover:bg-red-100">Del</button>
+                      <SubmitButton className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-600 hover:bg-red-100">Del</SubmitButton>
                     </form>
                   </div>
                 </td>
@@ -152,7 +153,7 @@ export default async function WorkersPage({
                       </select>
                       <textarea name="notes" defaultValue={String(w.notes ?? '')} placeholder="Notes" className="rounded border border-zinc-300 px-3 py-2 text-sm sm:col-span-2" rows={2} />
                       <div className="flex gap-2 sm:col-span-2">
-                        <button type="submit" className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Save</button>
+                        <SubmitButton className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Save</SubmitButton>
                         <a href="/workers" className="rounded border border-zinc-300 px-4 py-2 text-sm">Cancel</a>
                       </div>
                     </form>

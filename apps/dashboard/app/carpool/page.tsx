@@ -1,3 +1,4 @@
+import { SubmitButton } from "../components/submit-button";
 import { adminFetch, AdminRecord, text } from '../lib/admin-api';
 import { updateCarpoolAction, toggleCarpoolAction, deleteCarpoolAction } from '../actions/admin';
 
@@ -51,13 +52,13 @@ export default async function CarpoolPage({
                       <form action={toggleCarpoolAction}>
                         <input type="hidden" name="id" value={String(r.id)} />
                         <input type="hidden" name="isPaused" value={String(!r.isPaused)} />
-                        <button type="submit" className={`rounded border px-2 py-1 text-xs ${r.isPaused ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                        <SubmitButton className={`rounded border px-2 py-1 text-xs ${r.isPaused ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
                           {r.isPaused ? 'Resume' : 'Pause'}
-                        </button>
+                        </SubmitButton>
                       </form>
                       <form action={deleteCarpoolAction}>
                         <input type="hidden" name="id" value={String(r.id)} />
-                        <button type="submit" className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-600 hover:bg-red-100">Del</button>
+                        <SubmitButton className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-600 hover:bg-red-100">Del</SubmitButton>
                       </form>
                     </div>
                   </td>
@@ -71,7 +72,7 @@ export default async function CarpoolPage({
                         <input name="departureTime" defaultValue={text(r.departureTime)} placeholder="Departure time" className="rounded border border-zinc-300 px-3 py-1.5 text-sm" />
                         <input name="returnTime" defaultValue={text(r.returnTime) === '-' ? '' : text(r.returnTime)} placeholder="Return time (optional)" className="rounded border border-zinc-300 px-3 py-1.5 text-sm" />
                         <input name="seatsAvailable" type="number" min="1" defaultValue={String(r.seatsAvailable ?? 1)} placeholder="Seats" className="w-24 rounded border border-zinc-300 px-3 py-1.5 text-sm" />
-                        <button type="submit" className="rounded bg-zinc-900 px-4 py-1.5 text-sm text-white">Save</button>
+                        <SubmitButton className="rounded bg-zinc-900 px-4 py-1.5 text-sm text-white">Save</SubmitButton>
                         <a href="/carpool" className="rounded border border-zinc-300 px-4 py-1.5 text-sm">Cancel</a>
                       </form>
                     </td>
