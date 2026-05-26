@@ -1,5 +1,6 @@
 import { adminFetch, AdminRecord, text } from '../lib/admin-api';
-import { updateResidentAction, deleteResidentAction } from '../actions/admin';
+import { updateResidentAction } from '../actions/admin';
+import { DeleteButton } from './delete-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,13 +48,7 @@ export default async function ResidentsPage({
                 <td className="text-right">
                   <div className="flex justify-end gap-2">
                     <a href={`/residents?search=${search}&edit=${r.id}`} className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50">Edit</a>
-                    <form action={deleteResidentAction}>
-                      <input type="hidden" name="id" value={String(r.id)} />
-                      <button type="submit" className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-600 hover:bg-red-100"
-                        onClick={(e) => { if (!confirm('Delete this resident and all their data?')) e.preventDefault(); }}>
-                        Delete
-                      </button>
-                    </form>
+                    <DeleteButton id={String(r.id)} />
                   </div>
                 </td>
               </tr>
