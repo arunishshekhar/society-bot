@@ -8,6 +8,14 @@ import {
   deleteCategoryAction,
 } from '../actions/admin';
 import { SubmitButton } from '../components/submit-button';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import Link from 'next/link';
+import React from 'react';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,133 +39,190 @@ export default async function ServicesPage({
   ])].sort();
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-8 text-zinc-950">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Services</h1>
+    <main className="container mx-auto max-w-6xl px-4 py-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">Services</h1>
         <div className="flex gap-2">
-          <a href="/services?addcat=1" className="rounded border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50">+ Category</a>
-          <a href="/services?add=1" className="rounded bg-zinc-900 px-3 py-2 text-sm text-white">+ Add Service</a>
+          <Link  href="/services?addcat=1" className={buttonVariants({ variant: "outline", size: "default" })}>+ Category</Link>
+          <Link  href="/services?add=1" className={buttonVariants({ variant: "default", size: "default" })}>+ Add Service</Link>
         </div>
       </div>
 
       {/* Category Manager */}
       {addcat && (
-        <section className="mt-4 rounded border border-zinc-200 bg-zinc-50 p-4">
-          <h2 className="mb-3 font-medium">Manage Service Categories</h2>
-          <form action={createCategoryAction} className="flex gap-2">
-            <input type="hidden" name="type" value="service" />
-            <input name="name" placeholder="New category name" required className="flex-1 rounded border border-zinc-300 px-3 py-2 text-sm" />
-            <SubmitButton className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Add</SubmitButton>
-            <a href="/services" className="rounded border border-zinc-300 px-4 py-2 text-sm">Close</a>
-          </form>
-          {categoryList.length > 0 && (
-            <ul className="mt-4 space-y-1">
-              {categoryList.map((c) => (
-                <li key={String(c.id)} className="flex items-center justify-between rounded bg-white px-3 py-2 text-sm border border-zinc-200">
-                  <span className="capitalize">{text(c.name)}</span>
-                  <form action={deleteCategoryAction}>
-                    <input type="hidden" name="id" value={String(c.id)} />
-                    <input type="hidden" name="type" value="service" />
-                    <SubmitButton className="text-xs text-red-500 hover:text-red-700">Remove</SubmitButton>
-                  </form>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <Card className="mb-6 bg-muted/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Manage Service Categories</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form action={createCategoryAction} className="flex gap-2 mb-4">
+              <input type="hidden" name="type" value="service" />
+              <Input name="name" placeholder="New category name" required className="max-w-xs bg-background" />
+              <SubmitButton>Add</SubmitButton>
+              <Link  href="/services" className={buttonVariants({ variant: "outline", size: "default" })}>Close</Link>
+            </form>
+            {categoryList.length > 0 && (
+              <div className="grid gap-2 max-w-md">
+                {categoryList.map((c) => (
+                  <div key={String(c.id)} className="flex items-center justify-between rounded-md border bg-background px-3 py-2 text-sm shadow-sm">
+                    <span className="capitalize font-medium">{text(c.name)}</span>
+                    <form action={deleteCategoryAction}>
+                      <input type="hidden" name="id" value={String(c.id)} />
+                      <input type="hidden" name="type" value="service" />
+                      <SubmitButton variant="ghost" size="sm" className="h-auto p-1 text-destructive hover:text-destructive hover:bg-destructive/10">
+                        Remove
+                      </SubmitButton>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Add Service Form */}
       {add && (
-        <section className="mt-4 rounded border border-zinc-200 bg-zinc-50 p-4">
-          <h2 className="mb-3 font-medium">Add Service</h2>
-          <form action={createServiceAction} className="grid gap-3 sm:grid-cols-2">
-            <input name="name" placeholder="Service name *" required className="rounded border border-zinc-300 px-3 py-2 text-sm" />
-            <select name="category" required className="rounded border border-zinc-300 px-3 py-2 text-sm">
-              {allCategories.map((c) => <option key={c} value={c} className="capitalize">{c}</option>)}
-            </select>
-            <input name="timing" placeholder="Timing (e.g. 9am-5pm)" className="rounded border border-zinc-300 px-3 py-2 text-sm" />
-            <select name="contactPreference" className="rounded border border-zinc-300 px-3 py-2 text-sm">
-              <option value="telegram">Contact via Telegram</option>
-              <option value="phone">Contact via Phone</option>
-            </select>
-            <textarea name="description" placeholder="Description" className="rounded border border-zinc-300 px-3 py-2 text-sm sm:col-span-2" rows={2} />
-            <div className="flex gap-2 sm:col-span-2">
-              <SubmitButton className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Save</SubmitButton>
-              <a href="/services" className="rounded border border-zinc-300 px-4 py-2 text-sm">Cancel</a>
-            </div>
-          </form>
-        </section>
+        <Card className="mb-6 bg-muted/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Add Service</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form action={createServiceAction} className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Service Name *</label>
+                <Input name="name" placeholder="Service name" required className="bg-background" />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Category *</label>
+                <Select name="category" required>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allCategories.map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Timing</label>
+                <Input name="timing" placeholder="e.g. 9am-5pm" className="bg-background" />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Contact Preference</label>
+                <Select name="contactPreference" defaultValue="telegram">
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Contact Preference" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="telegram">Contact via Telegram</SelectItem>
+                    <SelectItem value="phone">Contact via Phone</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2 sm:col-span-2">
+                <label className="text-sm font-medium">Description</label>
+                <Textarea name="description" placeholder="Description" className="bg-background resize-y" rows={2} />
+              </div>
+              <div className="flex gap-2 sm:col-span-2 pt-2">
+                <SubmitButton>Save Service</SubmitButton>
+                <Link  href="/services" className={buttonVariants({ variant: "outline", size: "default" })}>Cancel</Link>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       )}
 
       {/* Services Table */}
-      <table className="mt-6 w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b text-left text-zinc-500">
-            <th className="py-2">Name</th>
-            <th>Category</th>
-            <th>Resident</th>
-            <th>Status</th>
-            <th className="text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {serviceList.map((s) => {
-            const resident = s.resident as AdminRecord | undefined;
-            return (
-              <>
-                <tr key={String(s.id)} className="border-b">
-                  <td className="py-2 font-medium">{text(s.name)}</td>
-                  <td className="capitalize">{text(s.category)}</td>
-                  <td>{resident ? text(resident.flatNumber) : 'Admin'}</td>
-                  <td>
-                    <span className={`rounded px-2 py-0.5 text-xs font-medium ${
-                      s.isDisabled ? 'bg-red-100 text-red-600' : s.isPaused ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                    }`}>
-                      {s.isDisabled ? 'Disabled' : s.isPaused ? 'Paused' : 'Active'}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="flex justify-end gap-1">
-                      <a href={`/services?edit=${s.id}`} className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50">Edit</a>
-                      <form action={toggleServiceAction}>
-                        <input type="hidden" name="id" value={String(s.id)} />
-                        <input type="hidden" name="isDisabled" value={String(!s.isDisabled)} />
-                        <SubmitButton className={`rounded border px-2 py-1 text-xs ${s.isDisabled ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
-                          {s.isDisabled ? 'Enable' : 'Disable'}
-                        </SubmitButton>
-                      </form>
-                      <form action={deleteServiceAction}>
-                        <input type="hidden" name="id" value={String(s.id)} />
-                        <SubmitButton className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-600 hover:bg-red-100">Del</SubmitButton>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
-                {editId === String(s.id) && (
-                  <tr key={`edit-${String(s.id)}`} className="bg-zinc-50">
-                    <td colSpan={5} className="p-4">
-                      <form action={updateServiceAction} className="grid gap-3 sm:grid-cols-2">
-                        <input type="hidden" name="id" value={String(s.id)} />
-                        <input name="name" defaultValue={text(s.name)} placeholder="Name" className="rounded border border-zinc-300 px-3 py-2 text-sm" />
-                        <select name="category" defaultValue={String(s.category)} className="rounded border border-zinc-300 px-3 py-2 text-sm">
-                          {allCategories.map((c) => <option key={c} value={c} className="capitalize">{c}</option>)}
-                        </select>
-                        <textarea name="description" defaultValue={String(s.description ?? '')} placeholder="Description" className="rounded border border-zinc-300 px-3 py-2 text-sm sm:col-span-2" rows={2} />
-                        <div className="flex gap-2 sm:col-span-2">
-                          <SubmitButton className="rounded bg-zinc-900 px-4 py-2 text-sm text-white">Save</SubmitButton>
-                          <a href="/services" className="rounded border border-zinc-300 px-4 py-2 text-sm">Cancel</a>
-                        </div>
-                      </form>
-                    </td>
-                  </tr>
-                )}
-              </>
-            );
-          })}
-        </tbody>
-      </table>
-      {serviceList.length === 0 && <p className="mt-6 text-sm text-zinc-500">No services found.</p>}
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Resident</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {serviceList.map((s) => {
+              const resident = s.resident as AdminRecord | undefined;
+              return (
+                <React.Fragment key={String(s.id)}>
+                  <TableRow>
+                    <TableCell className="font-medium">{text(s.name)}</TableCell>
+                    <TableCell className="capitalize">{text(s.category)}</TableCell>
+                    <TableCell>{resident ? text(resident.flatNumber) : 'Admin'}</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        s.isDisabled ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : s.isPaused ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                      }`}>
+                        {s.isDisabled ? 'Disabled' : s.isPaused ? 'Paused' : 'Active'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Link  href={`/services?edit=${s.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>Edit</Link>
+                        <form action={toggleServiceAction}>
+                          <input type="hidden" name="id" value={String(s.id)} />
+                          <input type="hidden" name="isDisabled" value={String(!s.isDisabled)} />
+                          <SubmitButton variant={s.isDisabled ? "outline" : "secondary"} size="sm" className={s.isDisabled ? "text-emerald-600 hover:text-emerald-700 border-emerald-200" : "text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100"}>
+                            {s.isDisabled ? 'Enable' : 'Disable'}
+                          </SubmitButton>
+                        </form>
+                        <form action={deleteServiceAction}>
+                          <input type="hidden" name="id" value={String(s.id)} />
+                          <SubmitButton variant="destructive" size="sm">Del</SubmitButton>
+                        </form>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {editId === String(s.id) && (
+                    <TableRow key={`edit-${String(s.id)}`} className="bg-muted/50">
+                      <TableCell colSpan={5}>
+                        <form action={updateServiceAction} className="grid gap-4 sm:grid-cols-2 p-2">
+                          <input type="hidden" name="id" value={String(s.id)} />
+                          <div className="grid gap-2">
+                            <label className="text-xs font-medium">Name</label>
+                            <Input name="name" defaultValue={text(s.name)} placeholder="Name" className="bg-background" />
+                          </div>
+                          <div className="grid gap-2">
+                            <label className="text-xs font-medium">Category</label>
+                            <Select name="category" defaultValue={String(s.category)}>
+                              <SelectTrigger className="bg-background">
+                                <SelectValue placeholder="Category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {allCategories.map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid gap-2 sm:col-span-2">
+                            <label className="text-xs font-medium">Description</label>
+                            <Textarea name="description" defaultValue={String(s.description ?? '')} placeholder="Description" className="bg-background resize-y" rows={2} />
+                          </div>
+                          <div className="flex gap-2 sm:col-span-2">
+                            <SubmitButton size="sm">Save Changes</SubmitButton>
+                            <Link  href="/services" className={buttonVariants({ variant: "outline", size: "sm" })}>Cancel</Link>
+                          </div>
+                        </form>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
+              );
+            })}
+            {serviceList.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 text-center">
+                  No services found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </main>
   );
 }

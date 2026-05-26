@@ -38,8 +38,9 @@ export class AdminService {
 
   // ── Vehicles ───────────────────────────────────────────────
   vehicleLookup(plate: string) {
-    return this.prisma.vehicle.findFirst({
-      where: { number: { equals: plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() } },
+    const cleanPlate = plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    return this.prisma.vehicle.findMany({
+      where: { number: { contains: cleanPlate, mode: 'insensitive' } },
       include: { resident: true },
     });
   }

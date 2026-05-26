@@ -1,6 +1,11 @@
 import { SubmitButton } from "../components/submit-button";
 import { adminFetch, AdminRecord, text } from '../lib/admin-api';
 import { updateCarpoolAction, toggleCarpoolAction, deleteCarpoolAction } from '../actions/admin';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button, buttonVariants } from '@/components/ui/button';
+import Link from 'next/link';
+import React from 'react';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,77 +18,101 @@ export default async function CarpoolPage({
   const routes = (await adminFetch<AdminRecord[]>('/admin/carpool')) ?? [];
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-8 text-zinc-950">
-      <h1 className="text-2xl font-semibold">Carpool Routes</h1>
+    <main className="container mx-auto max-w-6xl px-4 py-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">Carpool Routes</h1>
+      </div>
 
-      <table className="mt-6 w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b text-left text-zinc-500">
-            <th className="py-2">Destination</th>
-            <th>Departure</th>
-            <th>Return</th>
-            <th>Seats</th>
-            <th>Days</th>
-            <th>Resident</th>
-            <th>Status</th>
-            <th className="text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {routes.map((r) => {
-            const resident = r.resident as AdminRecord | undefined;
-            return (
-              <>
-                <tr key={String(r.id)} className="border-b">
-                  <td className="py-2 font-medium">{text(r.destination)}</td>
-                  <td>{text(r.departureTime)}</td>
-                  <td>{text(r.returnTime)}</td>
-                  <td>{text(r.seatsAvailable)}</td>
-                  <td className="max-w-[120px] truncate">{Array.isArray(r.days) ? (r.days as string[]).join(', ') : '-'}</td>
-                  <td>{text(resident?.flatNumber)}</td>
-                  <td>
-                    <span className={`rounded px-2 py-0.5 text-xs font-medium ${r.isPaused ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                      {r.isPaused ? 'Paused' : 'Active'}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="flex justify-end gap-1">
-                      <a href={`/carpool?edit=${r.id}`} className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50">Edit</a>
-                      <form action={toggleCarpoolAction}>
-                        <input type="hidden" name="id" value={String(r.id)} />
-                        <input type="hidden" name="isPaused" value={String(!r.isPaused)} />
-                        <SubmitButton className={`rounded border px-2 py-1 text-xs ${r.isPaused ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
-                          {r.isPaused ? 'Resume' : 'Pause'}
-                        </SubmitButton>
-                      </form>
-                      <form action={deleteCarpoolAction}>
-                        <input type="hidden" name="id" value={String(r.id)} />
-                        <SubmitButton className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-600 hover:bg-red-100">Del</SubmitButton>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
-                {editId === String(r.id) && (
-                  <tr key={`edit-${String(r.id)}`} className="bg-zinc-50">
-                    <td colSpan={8} className="p-4">
-                      <form action={updateCarpoolAction} className="flex flex-wrap gap-3">
-                        <input type="hidden" name="id" value={String(r.id)} />
-                        <input name="destination" defaultValue={text(r.destination)} placeholder="Destination" className="rounded border border-zinc-300 px-3 py-1.5 text-sm" />
-                        <input name="departureTime" defaultValue={text(r.departureTime)} placeholder="Departure time" className="rounded border border-zinc-300 px-3 py-1.5 text-sm" />
-                        <input name="returnTime" defaultValue={text(r.returnTime) === '-' ? '' : text(r.returnTime)} placeholder="Return time (optional)" className="rounded border border-zinc-300 px-3 py-1.5 text-sm" />
-                        <input name="seatsAvailable" type="number" min="1" defaultValue={String(r.seatsAvailable ?? 1)} placeholder="Seats" className="w-24 rounded border border-zinc-300 px-3 py-1.5 text-sm" />
-                        <SubmitButton className="rounded bg-zinc-900 px-4 py-1.5 text-sm text-white">Save</SubmitButton>
-                        <a href="/carpool" className="rounded border border-zinc-300 px-4 py-1.5 text-sm">Cancel</a>
-                      </form>
-                    </td>
-                  </tr>
-                )}
-              </>
-            );
-          })}
-        </tbody>
-      </table>
-      {routes.length === 0 && <p className="mt-6 text-sm text-zinc-500">No carpool routes found.</p>}
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Destination</TableHead>
+              <TableHead>Departure</TableHead>
+              <TableHead>Return</TableHead>
+              <TableHead>Seats</TableHead>
+              <TableHead>Days</TableHead>
+              <TableHead>Resident</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {routes.map((r) => {
+              const resident = r.resident as AdminRecord | undefined;
+              return (
+                <React.Fragment key={String(r.id)}>
+                  <TableRow>
+                    <TableCell className="font-medium">{text(r.destination)}</TableCell>
+                    <TableCell>{text(r.departureTime)}</TableCell>
+                    <TableCell>{text(r.returnTime)}</TableCell>
+                    <TableCell>{text(r.seatsAvailable)}</TableCell>
+                    <TableCell className="max-w-[120px] truncate">{Array.isArray(r.days) ? (r.days as string[]).join(', ') : '-'}</TableCell>
+                    <TableCell>{text(resident?.flatNumber)}</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        r.isPaused ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                      }`}>
+                        {r.isPaused ? 'Paused' : 'Active'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Link  href={`/carpool?edit=${r.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>Edit</Link>
+                        <form action={toggleCarpoolAction}>
+                          <input type="hidden" name="id" value={String(r.id)} />
+                          <input type="hidden" name="isPaused" value={String(!r.isPaused)} />
+                          <SubmitButton variant={r.isPaused ? "outline" : "secondary"} size="sm" className={r.isPaused ? "text-emerald-600 hover:text-emerald-700 border-emerald-200" : "text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100"}>
+                            {r.isPaused ? 'Resume' : 'Pause'}
+                          </SubmitButton>
+                        </form>
+                        <form action={deleteCarpoolAction}>
+                          <input type="hidden" name="id" value={String(r.id)} />
+                          <SubmitButton variant="destructive" size="sm">Del</SubmitButton>
+                        </form>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {editId === String(r.id) && (
+                    <TableRow key={`edit-${String(r.id)}`} className="bg-muted/50">
+                      <TableCell colSpan={8}>
+                        <form action={updateCarpoolAction} className="flex flex-wrap items-end gap-3 p-2">
+                          <input type="hidden" name="id" value={String(r.id)} />
+                          <div className="grid gap-1">
+                            <label className="text-xs font-medium">Destination</label>
+                            <Input name="destination" defaultValue={text(r.destination)} placeholder="Destination" className="w-40 bg-background" />
+                          </div>
+                          <div className="grid gap-1">
+                            <label className="text-xs font-medium">Departure</label>
+                            <Input name="departureTime" defaultValue={text(r.departureTime)} placeholder="Departure" className="w-32 bg-background" />
+                          </div>
+                          <div className="grid gap-1">
+                            <label className="text-xs font-medium">Return</label>
+                            <Input name="returnTime" defaultValue={text(r.returnTime) === '-' ? '' : text(r.returnTime)} placeholder="Return" className="w-32 bg-background" />
+                          </div>
+                          <div className="grid gap-1">
+                            <label className="text-xs font-medium">Seats</label>
+                            <Input name="seatsAvailable" type="number" min="1" defaultValue={String(r.seatsAvailable ?? 1)} placeholder="Seats" className="w-24 bg-background" />
+                          </div>
+                          <SubmitButton size="sm">Save</SubmitButton>
+                          <Link  href="/carpool" className={buttonVariants({ variant: "outline", size: "sm" })}>Cancel</Link>
+                        </form>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
+              );
+            })}
+            {routes.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} className="h-24 text-center">
+                  No carpool routes found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </main>
   );
 }

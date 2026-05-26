@@ -6,11 +6,11 @@ export async function POST(req: NextRequest) {
   const imageFile = form.get('image') as File | null;
 
   if (!message && (!imageFile || imageFile.size === 0)) {
-    return NextResponse.redirect(new URL('/broadcast?error=empty', req.url));
+    return NextResponse.redirect(new URL('/broadcast?error=empty', req.url), { status: 303 });
   }
 
   if (!process.env.ADMIN_API_URL || !process.env.ADMIN_API_KEY) {
-    return NextResponse.redirect(new URL('/broadcast?error=config', req.url));
+    return NextResponse.redirect(new URL('/broadcast?error=config', req.url), { status: 303 });
   }
 
   form.append('sentBy', 'dashboard');
@@ -25,12 +25,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (!response.ok) {
-      return NextResponse.redirect(new URL('/broadcast?error=send', req.url));
+      return NextResponse.redirect(new URL('/broadcast?error=send', req.url), { status: 303 });
     }
 
     const result = (await response.json()) as { recipientCount?: number };
-    return NextResponse.redirect(new URL(`/broadcast?sent=${result.recipientCount ?? 0}`, req.url));
+    return NextResponse.redirect(new URL(`/broadcast?sent=${result.recipientCount ?? 0}`, req.url), { status: 303 });
   } catch {
-    return NextResponse.redirect(new URL('/broadcast?error=send', req.url));
+    return NextResponse.redirect(new URL('/broadcast?error=send', req.url), { status: 303 });
   }
 }

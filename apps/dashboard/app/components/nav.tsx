@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 const links = [
   ['/', 'Vehicle Lookup'],
@@ -12,14 +13,27 @@ const links = [
 
 export function Nav() {
   return (
-    <nav className="border-b border-zinc-200 bg-white">
-      <div className="mx-auto flex max-w-6xl flex-wrap gap-1 px-6 py-3 text-sm">
-        {links.map(([href, label]) => (
-          <Link key={href} href={href} className="rounded px-3 py-2 hover:bg-zinc-100">
-            {label}
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container mx-auto flex h-14 max-w-7xl items-center px-4">
+        <div className="mr-4 hidden md:flex">
+          <Link href="/" className="mr-6 flex items-center space-x-2">
+            <span className="hidden font-bold sm:inline-block">
+              Society Bot Admin
+            </span>
           </Link>
-        ))}
+          <nav className="flex items-center space-x-6 text-sm font-medium">
+            {links.map(([href, label]) => (
+              <Link
+                key={href}
+                href={href}
+                className="transition-colors hover:text-foreground/80 text-foreground/60"
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+        </div>
       </div>
-    </nav>
+    </header>
   );
 }
