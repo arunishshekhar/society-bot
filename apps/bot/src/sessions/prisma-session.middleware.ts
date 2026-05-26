@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import type { InputJsonValue } from '@prisma/client/runtime/library';
 import { PrismaService } from '../prisma/prisma.service';
 import { BotContext, BotSession } from '../types/bot-context';
 
@@ -20,7 +20,7 @@ export function createPrismaSessionMiddleware(prisma: PrismaService) {
 
     const sessionData = JSON.parse(
       JSON.stringify(ctx.session ?? {}),
-    ) as Prisma.InputJsonValue;
+    ) as InputJsonValue;
 
     await prisma.botSession.upsert({
       where: { telegramId: BigInt(telegramId) },

@@ -1,4 +1,5 @@
-export default function BroadcastPage({ searchParams }: { searchParams: { sent?: string; error?: string } }) {
+export default async function BroadcastPage({ searchParams }: { searchParams: Promise<{ sent?: string; error?: string }> }) {
+  const { sent, error } = await searchParams;
   return (
     <main className="mx-auto max-w-3xl px-6 py-8 text-zinc-950">
       <h1 className="text-2xl font-semibold">Broadcast</h1>
@@ -8,8 +9,8 @@ export default function BroadcastPage({ searchParams }: { searchParams: { sent?:
           <div className="font-medium">Society Notice</div>
           <p className="mt-1 text-zinc-600">Your message will be sent to all active residents.</p>
         </div>
-        {searchParams.sent ? <p className="mt-4 text-sm text-green-700">Sent to {searchParams.sent} residents.</p> : null}
-        {searchParams.error ? <p className="mt-4 text-sm text-red-600">Broadcast could not be sent.</p> : null}
+        {sent ? <p className="mt-4 text-sm text-green-700">Sent to {sent} residents.</p> : null}
+        {error ? <p className="mt-4 text-sm text-red-600">Broadcast could not be sent.</p> : null}
         <button className="mt-4 rounded bg-zinc-950 px-4 py-2 text-sm font-medium text-white">Send to active residents</button>
       </form>
     </main>

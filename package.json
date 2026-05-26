@@ -10,6 +10,7 @@
     "build:dashboard": "pnpm --filter @society-bot/dashboard build",
     "build": "pnpm build:bot && pnpm build:dashboard",
     "start:bot": "pnpm --filter @society-bot/bot start:prod",
+    "start:prod": "pnpm start:bot",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",

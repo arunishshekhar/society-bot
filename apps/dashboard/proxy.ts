@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const session = req.cookies.get('admin-session');
   const isLogin = req.nextUrl.pathname.startsWith('/login');
 

@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import type { InputJsonValue } from '@prisma/client/runtime/library';
 
 export type ServiceContactPreference = 'phone' | 'telegram';
 
@@ -10,14 +10,14 @@ export interface ServiceMetadata {
 export function buildServiceMetadata(
   timing: string,
   contactPreference: ServiceContactPreference,
-): Prisma.InputJsonValue {
+): InputJsonValue {
   return {
     timing: timing.trim(),
     contactPreference,
   };
 }
 
-export function readServiceMetadata(value: Prisma.JsonValue): ServiceMetadata {
+export function readServiceMetadata(value: unknown): ServiceMetadata {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return { contactPreference: 'telegram' };
   }

@@ -2,8 +2,9 @@ import { adminFetch, AdminRecord, text } from './lib/admin-api';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Page({ searchParams }: { searchParams: { plate?: string } }) {
-  const plate = searchParams.plate?.trim();
+export default async function Page({ searchParams }: { searchParams: Promise<{ plate?: string }> }) {
+  const { plate: rawPlate } = await searchParams;
+  const plate = rawPlate?.trim();
   const vehicle = plate
     ? await adminFetch<AdminRecord>(`/admin/vehicles/lookup?plate=${encodeURIComponent(plate)}`)
     : null;

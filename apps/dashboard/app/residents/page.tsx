@@ -2,8 +2,9 @@ import { adminFetch, AdminRecord, text } from '../lib/admin-api';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ResidentsPage({ searchParams }: { searchParams: { search?: string } }) {
-  const search = searchParams.search ?? '';
+export default async function ResidentsPage({ searchParams }: { searchParams: Promise<{ search?: string }> }) {
+  const { search: rawSearch } = await searchParams;
+  const search = rawSearch ?? '';
   const residents = (await adminFetch<AdminRecord[]>(`/admin/residents?search=${encodeURIComponent(search)}`)) ?? [];
   return (
     <main className="mx-auto max-w-6xl px-6 py-8 text-zinc-950">
