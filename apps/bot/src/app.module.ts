@@ -21,7 +21,7 @@ import { AdminModule } from './modules/admin/admin.module';
       inject: [PrismaService],
       useFactory: (prisma: PrismaService) => ({
         token: process.env.TELEGRAM_BOT_TOKEN ?? '',
-        middlewares: [createIdleTimeoutMiddleware(), createPrismaSessionMiddleware(prisma)],
+        middlewares: [createPrismaSessionMiddleware(prisma), createIdleTimeoutMiddleware()],
         include: [AppModule],
         launchOptions: process.env.WEBHOOK_DOMAIN
           ? {
