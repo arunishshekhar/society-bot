@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Action, Command, Ctx, Start, Update } from 'nestjs-telegraf';
 import { mainMenuKeyboard } from './keyboards/main-menu.keyboard';
 import { PrismaService } from './prisma/prisma.service';
@@ -5,10 +6,13 @@ import { BotContext } from './types/bot-context';
 
 @Update()
 export class AppUpdate {
+  private readonly logger = new Logger(AppUpdate.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   @Start()
   async start(@Ctx() ctx: BotContext) {
+    this.logger.log(`[/start] userId=${ctx.from?.id} username=${ctx.from?.username ?? 'n/a'}`);
     const telegramId = BigInt(ctx.from?.id ?? 0);
     const resident = await this.prisma.resident.findUnique({
       where: { telegramId },
@@ -29,6 +33,7 @@ export class AppUpdate {
 
   @Command('menu')
   async menu(@Ctx() ctx: BotContext) {
+    this.logger.log(`[/menu] userId=${ctx.from?.id}`);
     if (!(await this.ensureActiveOnboardedResident(ctx))) return;
     await this.showMainMenu(ctx);
   }
@@ -80,6 +85,7 @@ export class AppUpdate {
   }
 
   private async enterScene(ctx: BotContext, sceneId: string) {
+    this.logger.log(`[scene:enter] scene=${sceneId} userId=${ctx.from?.id}`);
     await ctx.answerCbQuery();
     if (!(await this.ensureActiveOnboardedResident(ctx))) return;
     await ctx.scene.enter(sceneId);
