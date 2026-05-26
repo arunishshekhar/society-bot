@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { broadcastAction } from '../actions/admin';
 
 export default async function BroadcastPage({ searchParams }: { searchParams: Promise<{ sent?: string; error?: string }> }) {
   const { sent, error } = await searchParams;
@@ -16,7 +17,7 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action="/api/broadcast" method="post" encType="multipart/form-data" className="grid gap-6">
+          <form action={broadcastAction} className="grid gap-6">
             <div className="grid gap-2">
               <Label htmlFor="message">Message</Label>
               <Textarea

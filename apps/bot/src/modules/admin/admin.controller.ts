@@ -199,12 +199,13 @@ export class AdminController {
           await this.bot.telegram.sendPhoto(
             Number(resident.telegramId),
             { source: imageBuffer },
-            { caption: `Society Notice\n\n${message}` }
+            { caption: `Society Notice\n\n${message}`, parse_mode: 'MarkdownV2' }
           );
         } else {
           await this.bot.telegram.sendMessage(
             Number(resident.telegramId),
             `Society Notice\n\n${message}`,
+            { parse_mode: 'MarkdownV2' }
           );
         }
         sent += 1;

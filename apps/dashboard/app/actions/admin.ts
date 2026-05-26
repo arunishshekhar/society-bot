@@ -169,3 +169,42 @@ export async function deleteCategoryAction(formData: FormData) {
   revalidatePath(type === 'worker' ? '/workers' : '/services');
   redirect(type === 'worker' ? '/workers' : '/services');
 }
+
+// ── Broadcast ──────────────────────────────────────────────
+export async function broadcastAction(formData: FormData) {
+  const message = String(formData.get('message') ?? '').trim();
+  const imageFile = formData.get('image') as File | null;
+
+  if (!message && (!imageFile || imageFile.size === 0)) {
+    redirect('/broadcast?error=empty');
+  }
+
+  formData.append('sentBy', 'dashboard');
+
+  let success = false;
+  let sentCount = 0;
+  
+  try {
+    const res = await fetch(`${api}/admin/broadcast`, {
+      method: 'POST',
+      headers: { 'x-admin-api-key': key },
+      body: formData,
+      cache: 'no-store',
+    });
+
+    if (res.ok) {
+      success = true;
+      const result = (await res.json()) as { recipientCount?: number };
+      sentCount = result.recipientCount ?? 0;
+    }
+  } catch {
+    success = false;
+  }
+  
+  if (success) {
+    redirect(`/broadcast?sent=${sentCount}`);
+  } else {
+    redirect('/broadcast?error=send');
+  }
+}
+
