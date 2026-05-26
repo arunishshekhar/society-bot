@@ -42,6 +42,13 @@ export class AppUpdate {
     await this.showMainMenu(ctx);
   }
 
+  @Command('exit')
+  async exit(@Ctx() ctx: BotContext) {
+    this.logger.log(`[/exit] userId=${ctx.from?.id}`);
+    if (!(await this.ensureActiveOnboardedResident(ctx))) return;
+    await this.showMainMenu(ctx);
+  }
+
   @Command('ask')
   async ask(@Ctx() ctx: BotContext) {
     if (!(await this.ensureActiveOnboardedResident(ctx))) return;

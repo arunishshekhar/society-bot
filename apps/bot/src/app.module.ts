@@ -6,6 +6,7 @@ import { HealthController } from './health.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaService } from './prisma/prisma.service';
 import { createPrismaSessionMiddleware } from './sessions/prisma-session.middleware';
+import { createIdleTimeoutMiddleware } from './sessions/idle-timeout.middleware';
 import { scenes } from './scenes';
 import { SearchModule } from './modules/search/search.module';
 import { AdminModule } from './modules/admin/admin.module';
@@ -20,7 +21,7 @@ import { AdminModule } from './modules/admin/admin.module';
       inject: [PrismaService],
       useFactory: (prisma: PrismaService) => ({
         token: process.env.TELEGRAM_BOT_TOKEN ?? '',
-        middlewares: [createPrismaSessionMiddleware(prisma)],
+        middlewares: [createIdleTimeoutMiddleware(), createPrismaSessionMiddleware(prisma)],
         include: [AppModule],
         launchOptions: process.env.WEBHOOK_DOMAIN
           ? {

@@ -64,9 +64,16 @@ export class ProfileScene {
     await ctx.reply('Society Bot', mainMenuKeyboard());
   }
 
-  @Command('ask')
+  @Command(['ask', 'menu', 'exit'])
   async onAskCommand(@Ctx() ctx: BotContext) {
     const text = (ctx.message as { text?: string })?.text ?? '';
+    
+    if (text.startsWith('/menu') || text.startsWith('/exit')) {
+      await ctx.scene.leave();
+      await ctx.reply('Society Bot', mainMenuKeyboard());
+      return;
+    }
+    
     const query = text.replace(/^\/ask\s*/i, '').trim();
     await ctx.scene.leave();
     await this.searchService.handleAsk(ctx, query);

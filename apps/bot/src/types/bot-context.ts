@@ -77,6 +77,7 @@ export interface BotSession extends Scenes.SceneSession<BotSceneSessionData> {
   search?: {
     awaitingQuery?: boolean;
   };
+  __lastActivity?: number;
 }
 
 export type BotContext = Context &

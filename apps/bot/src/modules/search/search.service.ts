@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Markup } from 'telegraf';
 import Groq from 'groq-sdk';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeSearchIntent, SearchIntent } from './search-intent';
 import { BotContext } from '../../types/bot-context';
@@ -133,13 +134,20 @@ Respond ONLY with valid JSON.`,
       ]),
     ];
 
+    const where: Prisma.MicroServiceWhereInput = {
+      isPaused: false,
+      isDisabled: false,
+      OR: [
+        { resident: { isActive: true } },
+        { residentId: null }
+      ]
+    };
+    if (orClauses.length > 0) {
+      where.AND = [{ OR: orClauses }];
+    }
+
     const services = await this.prisma.microService.findMany({
-      where: {
-        isPaused: false,
-        isDisabled: false,
-        resident: { isActive: true },
-        ...(orClauses.length ? { OR: orClauses } : {}),
-      },
+      where,
       include: { resident: true },
       take: 5,
     });
@@ -161,17 +169,17 @@ Respond ONLY with valid JSON.`,
   async replyCarpool(ctx: BotContext, destination?: string, days?: string[], keywords: string[] = []): Promise<void> {
     const destTerm = destination ?? keywords.find((k) => k.length > 3);
 
-    const where: Record<string, unknown> = {
+    const where: Prisma.CarpoolRouteWhereInput = {
       isPaused: false,
       resident: { isActive: true },
     };
 
     if (destTerm) {
-      where['destination'] = { contains: destTerm, mode: 'insensitive' };
+      where.destination = { contains: destTerm, mode: 'insensitive' };
     }
 
     if (days && days.length > 0) {
-      where['days'] = { hasSome: days };
+      where.days = { hasSome: days };
     }
 
     const routes = await this.prisma.carpoolRoute.findMany({
