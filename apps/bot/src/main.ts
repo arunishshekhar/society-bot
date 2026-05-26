@@ -37,7 +37,9 @@ async function bootstrap() {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const expressApp = app.getHttpAdapter().getInstance();
         const bot: Telegraf = app.get(getBotToken());
-        expressApp.use(HOOK_PATH, bot.webhookCallback(HOOK_PATH));
+        // Mount at root — Express strips the path prefix when using app.use(path, cb),
+        // so webhookCallback would see '/' instead of '/telegram-webhook' and 404.
+        expressApp.use(bot.webhookCallback(HOOK_PATH));
         console.log(`[webhook] Mounted Telegraf handler at ${HOOK_PATH}`);
       }
 
