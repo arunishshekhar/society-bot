@@ -1,12 +1,9 @@
-import { UseGuards } from '@nestjs/common';
 import { Action, Command, Ctx, Start, Update } from 'nestjs-telegraf';
-import { GroupMemberGuard } from './guards/group-member.guard';
 import { mainMenuKeyboard } from './keyboards/main-menu.keyboard';
 import { PrismaService } from './prisma/prisma.service';
 import { BotContext } from './types/bot-context';
 
 @Update()
-@UseGuards(GroupMemberGuard)
 export class AppUpdate {
   constructor(private readonly prisma: PrismaService) {}
 
