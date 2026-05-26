@@ -4,6 +4,10 @@ export interface SearchIntent {
   type: SearchIntentType;
   category?: string;
   keywords: string[];
+  // Carpool-specific extras extracted by AI
+  destination?: string;
+  days?: string[];   // e.g. ['Mon', 'Wed']
+  time?: string;     // e.g. '8AM', '8:10AM'
 }
 
 export function normalizeSearchIntent(value: unknown): SearchIntent {
@@ -22,7 +26,13 @@ export function normalizeSearchIntent(value: unknown): SearchIntent {
         .slice(0, 8)
     : [];
 
-  return { type, category, keywords };
+  const destination = typeof record.destination === 'string' && record.destination ? record.destination : undefined;
+  const days = Array.isArray(record.days)
+    ? record.days.filter((d): d is string => typeof d === 'string')
+    : undefined;
+  const time = typeof record.time === 'string' && record.time ? record.time : undefined;
+
+  return { type, category, keywords, destination, days, time };
 }
 
 function isIntentType(value: unknown): value is SearchIntentType {

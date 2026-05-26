@@ -19,11 +19,24 @@ export class SearchService {
         model: 'llama-3.1-8b-instant',
         messages: [
           {
+            role: 'system',
+            content: `You are a housing society assistant that extracts structured search intent from resident queries.
+Classify each query and extract the following JSON fields:
+- type: "worker" | "service" | "carpool" | "unknown"
+- category: specific type of worker or service (e.g. "maid", "cook", "plumber", "tutor", "laundry")
+- keywords: array of key descriptors (e.g. ["north indian", "experienced", "full time"])
+- destination: for carpool queries, the destination location (e.g. "MG Road", "Whitefield")
+- days: for carpool queries, array of abbreviated days (e.g. ["Mon","Wed","Fri"])
+- time: for carpool queries, departure time mentioned (e.g. "8AM", "8:30AM")
+
+Respond ONLY with valid JSON.`,
+          },
+          {
             role: 'user',
-            content: `Classify this housing society query as worker, service, carpool, or unknown. Extract category and keywords. Respond only with JSON: {"type":"worker|service|carpool|unknown","category":"string","keywords":["string"]}\nQuery: ${query}`,
+            content: query,
           },
         ],
-        max_tokens: 120,
+        max_tokens: 200,
         response_format: { type: 'json_object' },
       });
 
