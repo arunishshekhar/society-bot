@@ -13,20 +13,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.redirect(new URL('/broadcast?error=config', req.url));
   }
 
-  let base64Image: string | undefined;
-  if (imageFile && imageFile.size > 0) {
-    const buffer = await imageFile.arrayBuffer();
-    base64Image = Buffer.from(buffer).toString('base64');
-  }
+  form.append('sentBy', 'dashboard');
 
   try {
     const response = await fetch(`${process.env.ADMIN_API_URL}/admin/broadcast`, {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
         'x-admin-api-key': process.env.ADMIN_API_KEY,
       },
-      body: JSON.stringify({ message, image: base64Image, sentBy: 'dashboard' }),
+      body: form,
     });
 
     if (!response.ok) {

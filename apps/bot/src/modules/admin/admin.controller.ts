@@ -7,9 +7,13 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { InjectBot } from 'nestjs-telegraf';
 import { Telegraf } from 'telegraf';
 import { AdminApiKeyGuard } from './admin-api-key.guard';
@@ -176,15 +180,17 @@ export class AdminController {
 
   // ── Broadcast ──────────────────────────────────────────────
   @Post('broadcast')
-  async broadcast(@Body() body: { message: string; image?: string; sentBy?: string }) {
-    this.logger.log(`POST /admin/broadcast sentBy=${body.sentBy ?? 'admin'} image=${!!body.image}`);
+  @UseInterceptors(FileInterceptor('image'))
+  async broadcast(
+    @Body('message') message: string,
+    @UploadedFile() file?: Express.Multer.File,
+    @Body('sentBy') sentBy?: string,
+  ) {
+    this.logger.log(`POST /admin/broadcast sentBy=${sentBy ?? 'admin'} image=${!!file}`);
     const residents = await this.admin.activeResidents();
     this.logger.log(`Broadcast target: ${residents.length} active residents`);
     
-    let imageBuffer: Buffer | null = null;
-    if (body.image) {
-      imageBuffer = Buffer.from(body.image, 'base64');
-    }
+    const imageBuffer = file?.buffer ?? null;
 
     let sent = 0;
     for (const resident of residents) {
@@ -193,12 +199,12 @@ export class AdminController {
           await this.bot.telegram.sendPhoto(
             Number(resident.telegramId),
             { source: imageBuffer },
-            { caption: `Society Notice\n\n${body.message}` }
+            { caption: `Society Notice\n\n${message}` }
           );
         } else {
           await this.bot.telegram.sendMessage(
             Number(resident.telegramId),
-            `Society Notice\n\n${body.message}`,
+            `Society Notice\n\n${message}`,
           );
         }
         sent += 1;
@@ -206,7 +212,7 @@ export class AdminController {
         // Keep broadcasting to remaining residents.
       }
     }
-    await this.admin.logBroadcast(body.message, body.sentBy ?? 'admin', sent);
+    await this.admin.logBroadcast(message, sentBy ?? 'admin', sent);
     this.logger.log(`Broadcast complete: sent=${sent}/${residents.length}`);
     return { recipientCount: sent };
   }

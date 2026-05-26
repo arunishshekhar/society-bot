@@ -23,6 +23,7 @@
     "test": "pnpm --filter @society-bot/bot test"
   },
   "devDependencies": {
+    "@types/multer": "^2.1.0",
     "prettier": "latest",
     "typescript": "^5.9.3"
   }
