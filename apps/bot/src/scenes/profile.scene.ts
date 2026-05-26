@@ -1,0 +1,139 @@
+import { UseGuards } from '@nestjs/common';
+import { Action, Ctx, On, Scene, SceneEnter } from 'nestjs-telegraf';
+import { Markup } from 'telegraf';
+import { GroupMemberGuard } from '../guards/group-member.guard';
+import { mainMenuKeyboard } from '../keyboards/main-menu.keyboard';
+import { PrismaService } from '../prisma/prisma.service';
+import { BotContext } from '../types/bot-context';
+import { isValidFlatNumber, isValidName, normalizeFlatNumber } from '../utils/validation';
+
+@Scene('profile')
+@UseGuards(GroupMemberGuard)
+export class ProfileScene {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @SceneEnter()
+  async enter(@Ctx() ctx: BotContext) {
+    ctx.session.profile = {};
+    await this.showProfile(ctx);
+  }
+
+  @Action('profile:edit_name')
+  async editName(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    ctx.session.profile = { editing: 'name' };
+    await ctx.reply('Enter your updated name.');
+  }
+
+  @Action('profile:edit_flat')
+  async editFlat(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    ctx.session.profile = { editing: 'flatNumber' };
+    await ctx.reply('Enter your updated flat number. Example: A-101');
+  }
+
+  @Action('profile:edit_phone')
+  async editPhone(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    ctx.session.profile = { editing: 'phone' };
+    await ctx.reply(
+      'Enter your updated phone number.',
+      Markup.inlineKeyboard([
+        [Markup.button.callback('Clear phone', 'profile:clear_phone')],
+      ]),
+    );
+  }
+
+  @Action('profile:clear_phone')
+  async clearPhone(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    await this.updateResident(ctx, { phone: null });
+    ctx.session.profile = {};
+    await ctx.reply('Phone number cleared.');
+    await this.showProfile(ctx);
+  }
+
+  @Action('menu:back')
+  async back(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    await ctx.scene.leave();
+    await ctx.reply('Society Bot', mainMenuKeyboard());
+  }
+
+  @On('text')
+  async onText(@Ctx() ctx: BotContext) {
+    const field = ctx.session.profile?.editing;
+    const text = ctx.text?.trim();
+
+    if (!field || !text) {
+      await this.showProfile(ctx);
+      return;
+    }
+
+    if (field === 'name' && !isValidName(text)) {
+      await ctx.reply('Please enter a name between 2 and 80 characters.');
+      return;
+    }
+
+    if (field === 'flatNumber' && !isValidFlatNumber(text)) {
+      await ctx.reply('Please enter a valid flat number, for example A-101.');
+      return;
+    }
+
+    await this.updateResident(ctx, {
+      [field]: field === 'flatNumber' ? normalizeFlatNumber(text) : text,
+    });
+    ctx.session.profile = {};
+    await ctx.reply('Profile updated.');
+    await this.showProfile(ctx);
+  }
+
+  private async showProfile(ctx: BotContext) {
+    const resident = await this.getResident(ctx);
+
+    if (!resident) {
+      await ctx.scene.enter('onboarding');
+      return;
+    }
+
+    await ctx.reply(
+      [
+        'My Profile',
+        '',
+        `Name: ${resident.name}`,
+        `Flat: ${resident.flatNumber}`,
+        `Phone: ${resident.phone ?? 'Not set'}`,
+      ].join('\n'),
+      Markup.inlineKeyboard([
+        [
+          Markup.button.callback('Edit Name', 'profile:edit_name'),
+          Markup.button.callback('Edit Flat', 'profile:edit_flat'),
+        ],
+        [Markup.button.callback('Edit Phone', 'profile:edit_phone')],
+        [Markup.button.callback('Back', 'menu:back')],
+      ]),
+    );
+  }
+
+  private async getResident(ctx: BotContext) {
+    const telegramId = ctx.from?.id;
+    if (!telegramId) return null;
+
+    return this.prisma.resident.findUnique({
+      where: { telegramId: BigInt(telegramId) },
+    });
+  }
+
+  private async updateResident(
+    ctx: BotContext,
+    data: { name?: string; flatNumber?: string; phone?: string | null },
+  ) {
+    const telegramId = ctx.from?.id;
+    if (!telegramId) return;
+
+    await this.prisma.resident.update({
+      where: { telegramId: BigInt(telegramId) },
+      data,
+    });
+  }
+}

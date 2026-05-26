@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: society-bot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: society_bot
+      POSTGRES_USER: society_bot
+      POSTGRES_PASSWORD: society_bot
+    ports:
+      - "5432:5432"
+    volumes:
+      - society_bot_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U society_bot -d society_bot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  society_bot_postgres_data:

@@ -1,0 +1,28 @@
+{
+  "name": "society-bot",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev:bot": "pnpm --filter @society-bot/bot start:dev",
+    "dev:dashboard": "pnpm --filter @society-bot/dashboard dev",
+    "build:bot": "pnpm --filter @society-bot/bot build",
+    "build:dashboard": "pnpm --filter @society-bot/dashboard build",
+    "build": "pnpm build:bot && pnpm build:dashboard",
+    "start:bot": "pnpm --filter @society-bot/bot start:prod",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:migrate": "pnpm --filter @society-bot/bot prisma:migrate",
+    "db:migrate:init": "pnpm --filter @society-bot/bot prisma:migrate:init",
+    "db:studio": "pnpm --filter @society-bot/bot prisma:studio",
+    "prisma:generate": "pnpm --filter @society-bot/bot prisma:generate",
+    "prisma:migrate": "pnpm --filter @society-bot/bot prisma:migrate",
+    "lint": "pnpm --filter @society-bot/bot lint",
+    "test": "pnpm --filter @society-bot/bot test"
+  },
+  "devDependencies": {
+    "prettier": "latest",
+    "typescript": "^5.9.3"
+  }
+}

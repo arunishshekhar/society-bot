@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Resident {
+  id                   String                 @id @default(uuid())
+  telegramId           BigInt                 @unique
+  telegramUsername     String?
+  name                 String
+  flatNumber           String
+  phone                String?
+  isActive             Boolean                @default(true)
+  onboardingComplete   Boolean                @default(false)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  vehicles             Vehicle[]
+  workerRecs           WorkerRecommendation[]
+  microService         MicroService?
+  carpoolRoutes        CarpoolRoute[]
+}
+
+model Vehicle {
+  id          String   @id @default(uuid())
+  residentId  String
+  number      String   @unique
+  type        String
+  color       String?
+  model       String?
+  parkingSlot String?
+  createdAt   DateTime @default(now())
+  resident    Resident @relation(fields: [residentId], references: [id])
+}
+
+model WorkerRecommendation {
+  id          String   @id @default(uuid())
+  residentId  String
+  name        String
+  phone       String
+  category    String
+  tags        String[]
+  rating      Int?
+  notes       String?
+  isActive    Boolean  @default(true)
+  isBanned    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  resident    Resident @relation(fields: [residentId], references: [id])
+}
+
+model MicroService {
+  id          String   @id @default(uuid())
+  residentId  String   @unique
+  name        String
+  category    String
+  description String?
+  isPaused    Boolean  @default(false)
+  isDisabled  Boolean  @default(false)
+  metadata    Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  resident    Resident @relation(fields: [residentId], references: [id])
+}
+
+model CarpoolRoute {
+  id             String   @id @default(uuid())
+  residentId     String
+  destination    String
+  startPoint     String?
+  departureTime  String
+  returnTime     String?
+  seatsAvailable Int
+  days           String[]
+  isPaused       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  resident       Resident @relation(fields: [residentId], references: [id])
+}
+
+model BotSession {
+  id          String    @id @default(uuid())
+  telegramId  BigInt
+  sessionData Json
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([telegramId])
+}
+
+model Broadcast {
+  id             String   @id @default(uuid())
+  message        String
+  sentBy         String
+  sentAt         DateTime @default(now())
+  recipientCount Int
+}
