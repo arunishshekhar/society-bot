@@ -1,5 +1,6 @@
 import { UseGuards } from '@nestjs/common';
 import { Action, Ctx, On, Scene, SceneEnter } from 'nestjs-telegraf';
+import { Vehicle } from '@prisma/client';
 import { Markup } from 'telegraf';
 import { GroupMemberGuard } from '../guards/group-member.guard';
 import { mainMenuKeyboard } from '../keyboards/main-menu.keyboard';
@@ -230,7 +231,7 @@ export class VehicleScene {
     });
 
     const lines = vehicles.length
-      ? vehicles.map((vehicle, index) => {
+      ? vehicles.map((vehicle: Vehicle, index: number) => {
           const details = [vehicle.model, vehicle.color, vehicle.parkingSlot]
             .filter(Boolean)
             .join(', ');
@@ -241,7 +242,7 @@ export class VehicleScene {
     await ctx.reply(
       ['My Vehicles', '', ...lines].join('\n'),
       Markup.inlineKeyboard([
-        ...vehicles.map((vehicle) => [
+        ...vehicles.map((vehicle: Vehicle) => [
           Markup.button.callback(vehicle.number, `vehicles:select:${vehicle.id}`),
         ]),
         [Markup.button.callback('Add Vehicle', 'vehicles:add')],
