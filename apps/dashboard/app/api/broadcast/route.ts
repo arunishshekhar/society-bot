@@ -3,13 +3,20 @@ import { NextResponse, type NextRequest } from 'next/server';
 export async function POST(req: NextRequest) {
   const form = await req.formData();
   const message = String(form.get('message') ?? '').trim();
+  const imageFile = form.get('image') as File | null;
 
-  if (!message) {
+  if (!message && (!imageFile || imageFile.size === 0)) {
     return NextResponse.redirect(new URL('/broadcast?error=empty', req.url));
   }
 
   if (!process.env.ADMIN_API_URL || !process.env.ADMIN_API_KEY) {
     return NextResponse.redirect(new URL('/broadcast?error=config', req.url));
+  }
+
+  let base64Image: string | undefined;
+  if (imageFile && imageFile.size > 0) {
+    const buffer = await imageFile.arrayBuffer();
+    base64Image = Buffer.from(buffer).toString('base64');
   }
 
   try {
@@ -19,7 +26,7 @@ export async function POST(req: NextRequest) {
         'content-type': 'application/json',
         'x-admin-api-key': process.env.ADMIN_API_KEY,
       },
-      body: JSON.stringify({ message, sentBy: 'dashboard' }),
+      body: JSON.stringify({ message, image: base64Image, sentBy: 'dashboard' }),
     });
 
     if (!response.ok) {

@@ -1,4 +1,4 @@
-export type SearchIntentType = 'worker' | 'service' | 'carpool' | 'unknown';
+export type SearchIntentType = 'worker' | 'service' | 'carpool' | 'inform' | 'unknown';
 
 export interface SearchIntent {
   type: SearchIntentType;
@@ -8,6 +8,10 @@ export interface SearchIntent {
   destination?: string;
   days?: string[];   // e.g. ['Mon', 'Wed']
   time?: string;     // e.g. '8AM', '8:10AM'
+  // Inform-specific extras
+  target_type?: 'vehicle' | 'flat';
+  target_id?: string;
+  message?: string;
 }
 
 export function normalizeSearchIntent(value: unknown): SearchIntent {
@@ -32,9 +36,13 @@ export function normalizeSearchIntent(value: unknown): SearchIntent {
     : undefined;
   const time = typeof record.time === 'string' && record.time ? record.time : undefined;
 
-  return { type, category, keywords, destination, days, time };
+  const target_type = record.target_type === 'vehicle' || record.target_type === 'flat' ? record.target_type : undefined;
+  const target_id = typeof record.target_id === 'string' ? record.target_id : undefined;
+  const message = typeof record.message === 'string' ? record.message : undefined;
+
+  return { type, category, keywords, destination, days, time, target_type, target_id, message };
 }
 
 function isIntentType(value: unknown): value is SearchIntentType {
-  return value === 'worker' || value === 'service' || value === 'carpool' || value === 'unknown';
+  return value === 'worker' || value === 'service' || value === 'carpool' || value === 'inform' || value === 'unknown';
 }

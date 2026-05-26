@@ -176,17 +176,31 @@ export class AdminController {
 
   // ── Broadcast ──────────────────────────────────────────────
   @Post('broadcast')
-  async broadcast(@Body() body: { message: string; sentBy?: string }) {
-    this.logger.log(`POST /admin/broadcast sentBy=${body.sentBy ?? 'admin'}`);
+  async broadcast(@Body() body: { message: string; image?: string; sentBy?: string }) {
+    this.logger.log(`POST /admin/broadcast sentBy=${body.sentBy ?? 'admin'} image=${!!body.image}`);
     const residents = await this.admin.activeResidents();
     this.logger.log(`Broadcast target: ${residents.length} active residents`);
+    
+    let imageBuffer: Buffer | null = null;
+    if (body.image) {
+      imageBuffer = Buffer.from(body.image, 'base64');
+    }
+
     let sent = 0;
     for (const resident of residents) {
       try {
-        await this.bot.telegram.sendMessage(
-          Number(resident.telegramId),
-          `Society Notice\n\n${body.message}`,
-        );
+        if (imageBuffer) {
+          await this.bot.telegram.sendPhoto(
+            Number(resident.telegramId),
+            { source: imageBuffer },
+            { caption: `Society Notice\n\n${body.message}` }
+          );
+        } else {
+          await this.bot.telegram.sendMessage(
+            Number(resident.telegramId),
+            `Society Notice\n\n${body.message}`,
+          );
+        }
         sent += 1;
       } catch {
         // Keep broadcasting to remaining residents.

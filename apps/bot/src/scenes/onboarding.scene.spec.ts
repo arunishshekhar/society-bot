@@ -18,7 +18,7 @@ describe('OnboardingScene', () => {
 
     await scene.enter(ctx);
 
-    expect(ctx.reply).toHaveBeenCalledWith('What is your flat number? Example: A-101');
+    expect(ctx.reply).toHaveBeenCalledWith('What is your flat number? Pattern: Tower-Floor-Unit (e.g., 03-12-03 for Tower 3, Floor 12, Unit 3)');
   });
 
   it('validates flat number input and preserves the current step on failure', async () => {
@@ -31,13 +31,13 @@ describe('OnboardingScene', () => {
     await scene.onText(ctx);
 
     expect(ctx.session.onboarding?.step).toBe('flat');
-    expect(ctx.reply).toHaveBeenCalledWith('Please enter a valid flat number, for example A-101.');
+    expect(ctx.reply).toHaveBeenCalledWith('Please enter a valid flat number. Pattern: Tower-Floor-Unit (e.g., 03-12-03 for Tower 3, Floor 12, Unit 3).');
   });
 
   it('normalizes a valid flat number and moves to phone capture', async () => {
     const scene = new OnboardingScene({} as never, {} as never);
     const ctx = createContext({
-      text: 'a-101',
+      text: '03-12-03',
       session: { onboarding: { step: 'flat', name: 'Arunish' } },
     } as Partial<BotContext>);
 
@@ -45,7 +45,7 @@ describe('OnboardingScene', () => {
 
     expect(ctx.session.onboarding).toMatchObject({
       step: 'phone',
-      flatNumber: 'A-101',
+      flatNumber: '03-12-03',
     });
     expect(ctx.reply).toHaveBeenCalledWith(
       'Share your phone number, or skip it for now.',

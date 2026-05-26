@@ -170,8 +170,8 @@ export class VehicleScene {
 
     if (state.step === 'number') {
       const number = normalizeVehicleNumber(text);
-      if (!isValidVehicleNumber(number)) {
-        await ctx.reply('Please enter a valid vehicle number, for example KA01AB1234.');
+      if (!isValidVehicleNumber(text)) {
+        await ctx.reply('Please enter a valid vehicle number (at least 2 characters).');
         return;
       }
 

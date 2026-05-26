@@ -34,6 +34,8 @@ export class SearchService {
       await this.replyServices(ctx, intent.category, intent.keywords);
     } else if (intent.type === 'carpool') {
       await this.replyCarpool(ctx, intent.destination, intent.days, intent.keywords);
+    } else if (intent.type === 'inform') {
+      await this.replyInform(ctx, intent);
     } else {
       await ctx.reply(
         "🤔 I couldn't understand what you're looking for. Try being more specific.\n\nExamples:\n• /ask North Indian maid\n• /ask carpool MG Road Monday 8AM\n• /ask electrician",
@@ -60,12 +62,15 @@ export class SearchService {
             role: 'system',
             content: `You are a housing society assistant that extracts structured search intent from resident queries.
 Classify each query and extract the following JSON fields:
-- type: "worker" | "service" | "carpool" | "unknown"
+- type: "worker" | "service" | "carpool" | "inform" | "unknown"
 - category: specific type of worker or service (e.g. "maid", "cook", "plumber", "tutor", "laundry")
 - keywords: array of key descriptors (e.g. ["north indian", "experienced", "full time"])
 - destination: for carpool queries, the destination location (e.g. "MG Road", "Whitefield")
 - days: for carpool queries, array of abbreviated days (e.g. ["Mon","Wed","Fri"])
 - time: for carpool queries, departure time mentioned (e.g. "8AM", "8:30AM")
+- target_type: for inform queries, "vehicle" or "flat"
+- target_id: for inform queries, the flat or vehicle number (e.g. "KA12AS2322", "03-12-03")
+- message: for inform queries, the message to relay
 
 Respond ONLY with valid JSON.`,
           },
@@ -204,11 +209,74 @@ Respond ONLY with valid JSON.`,
     }
   }
 
+  async replyInform(ctx: BotContext, intent: SearchIntent): Promise<void> {
+    const { target_type, target_id, message } = intent;
+    if (!target_type || !target_id || !message) {
+      await ctx.reply('Please specify whether to inform a flat or vehicle owner, the number, and the message.');
+      return;
+    }
+
+    let residentId: string | undefined;
+
+    if (target_type === 'vehicle') {
+      const number = target_id.trim().replace(/\s+/g, ' ').toUpperCase();
+      const vehicle = await this.prisma.vehicle.findFirst({
+        where: { number: { contains: number } },
+        include: { resident: true },
+      });
+      if (vehicle?.resident) residentId = vehicle.resident.id;
+    } else if (target_type === 'flat') {
+      const flatNumber = target_id.trim();
+      const resident = await this.prisma.resident.findFirst({
+        where: { flatNumber: { contains: flatNumber, mode: 'insensitive' }, isActive: true },
+      });
+      if (resident) residentId = resident.id;
+    }
+
+    if (!residentId) {
+      await ctx.reply(`😕 Could not find an active owner for ${target_type} ${target_id}.`);
+      return;
+    }
+
+    const resident = await this.prisma.resident.findUnique({ where: { id: residentId } });
+    if (!resident || !resident.telegramId) return;
+
+    const sender = await this.prisma.resident.findUnique({
+      where: { telegramId: BigInt(ctx.from?.id ?? 0) }
+    });
+    const senderFlat = sender?.flatNumber ?? 'A Resident';
+
+    try {
+      await ctx.telegram.sendMessage(
+        Number(resident.telegramId),
+        `🔔 *Anonymous Message from ${senderFlat}*\n\nRegarding your ${target_type} ${target_id}:\n${message}`,
+        { parse_mode: 'Markdown' }
+      );
+      await ctx.reply(`✅ Message sent to the owner of ${target_type} ${target_id}.`);
+    } catch (err) {
+      await ctx.reply('❌ Failed to send the message. They might have blocked the bot.');
+    }
+  }
+
   // ─── Fallback ────────────────────────────────────────────────────────────────
 
   private fallbackIntent(query: string): SearchIntent {
     const lower = query.toLowerCase();
     const keywords = lower.split(/[^a-z0-9]+/).filter(Boolean).slice(0, 8);
+
+    if (/(inform|tell|message|notify)/.test(lower)) {
+      const match = query.match(/(?:inform|tell|message|notify)\s+(?:owner of|the owner of)?\s*(?:flat|vehicle|car|bike)?\s*([a-zA-Z0-9-]+)\s+(?:that)?\s*(.*)/i);
+      if (match) {
+        const isFlat = /^\d{1,2}-\d{1,2}-\d{1,2}$/.test(match[1]);
+        return {
+          type: 'inform',
+          keywords: [],
+          target_type: isFlat ? 'flat' : 'vehicle',
+          target_id: match[1],
+          message: match[2],
+        };
+      }
+    }
 
     if (/(carpool|ride|cab|whitefield|koramangala|electronic|mg road)/.test(lower)) {
       return { type: 'carpool', keywords };

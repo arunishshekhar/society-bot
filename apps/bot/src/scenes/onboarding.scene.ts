@@ -66,7 +66,7 @@ export class OnboardingScene {
 
     if (state.step === 'flat') {
       if (!isValidFlatNumber(text)) {
-        await ctx.reply('Please enter a valid flat number, for example A-101.');
+        await ctx.reply('Please enter a valid flat number. Pattern: Tower-Floor-Unit (e.g., 03-12-03 for Tower 3, Floor 12, Unit 3).');
         return;
       }
 
@@ -92,8 +92,8 @@ export class OnboardingScene {
 
     if (state.step === 'vehicle_number') {
       const number = normalizeVehicleNumber(text);
-      if (!isValidVehicleNumber(number)) {
-        await ctx.reply('Please enter a valid vehicle number, for example KA01AB1234.');
+      if (!isValidVehicleNumber(text)) {
+        await ctx.reply('Please enter a valid vehicle number (at least 2 characters).');
         return;
       }
 
@@ -170,7 +170,7 @@ export class OnboardingScene {
     await ctx.answerCbQuery();
     const state = ctx.session.onboarding ?? { step: 'vehicle_choice' };
     ctx.session.onboarding = { ...state, step: 'vehicle_number', vehicle: {} };
-    await ctx.reply('What is your vehicle number? Example: KA01AB1234');
+    await ctx.reply('What is your vehicle number?');
   }
 
   @Action('onboarding:skip_vehicle')
@@ -222,7 +222,7 @@ export class OnboardingScene {
     const step = ctx.session.onboarding?.step ?? 'name';
 
     if (step === 'flat') {
-      await ctx.reply('What is your flat number? Example: A-101');
+      await ctx.reply('What is your flat number? Pattern: Tower-Floor-Unit (e.g., 03-12-03 for Tower 3, Floor 12, Unit 3)');
       return;
     }
 
@@ -242,7 +242,7 @@ export class OnboardingScene {
     }
 
     if (step === 'vehicle_number') {
-      await ctx.reply('What is your vehicle number? Example: KA01AB1234');
+      await ctx.reply('What is your vehicle number?');
       return;
     }
 

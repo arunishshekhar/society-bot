@@ -33,7 +33,7 @@ export class ProfileScene {
   async editFlat(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
     ctx.session.profile = { editing: 'flatNumber' };
-    await ctx.reply('Enter your updated flat number. Example: A-101');
+    await ctx.reply('Enter your updated flat number. Pattern: Tower-Floor-Unit (e.g., 03-12-03)');
   }
 
   @Action('profile:edit_phone')
@@ -95,7 +95,7 @@ export class ProfileScene {
     }
 
     if (field === 'flatNumber' && !isValidFlatNumber(text)) {
-      await ctx.reply('Please enter a valid flat number, for example A-101.');
+      await ctx.reply('Please enter a valid flat number. Pattern: Tower-Floor-Unit (e.g., 03-12-03).');
       return;
     }
 
