@@ -4,19 +4,20 @@ export function isValidName(value: string) {
 }
 
 export function normalizeFlatNumber(value: string) {
-  return value.trim();
+  return value.trim().toUpperCase();
 }
 
 export function isValidFlatNumber(value: string) {
-  return /^[0-9]{1,2}-[0-9]{1,2}-[0-9]{1,2}$/.test(value.trim());
+  return /^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)+$/.test(value.trim());
 }
 
 export function normalizeVehicleNumber(value: string) {
-  return value.trim().replace(/\s+/g, " ").toUpperCase();
+  return value.trim().replace(/\s+/g, "").toUpperCase();
 }
 
 export function isValidVehicleNumber(value: string) {
-  return value.trim().length >= 2 && value.trim().length <= 20;
+  const trimmed = value.trim();
+  return trimmed.length >= 6 && trimmed.length <= 15 && /[a-zA-Z]/.test(trimmed);
 }
 
 export function isValidPhone(value: string) {

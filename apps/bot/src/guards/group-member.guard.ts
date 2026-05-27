@@ -30,11 +30,12 @@ export class GroupMemberGuard implements CanActivate {
       }
 
       return allowed;
-    } catch {
-      // getChatMember can fail if the bot isn't an admin in the group,
-      // or if the group ID is misconfigured. Fall back to allowing users
-      // rather than silently blocking everyone.
-      return true;
+    } catch (error) {
+      // getChatMember fails with "Bad Request: user not found" if the user has never 
+      // interacted with the group and is not a member.
+      // We must block them instead of falling back to true.
+      await this.replyNotMember(ctx, groupId);
+      return false;
     }
   }
 

@@ -65,6 +65,7 @@ export class AppUpdate {
   @Action("menu:back")
   async backToMenu(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
+    if (!(await this.ensureActiveOnboardedResident(ctx))) return;
     await ctx.scene.leave();
     await this.showMainMenu(ctx);
   }
@@ -107,6 +108,7 @@ export class AppUpdate {
   @Action(/carpool_manage:accept:(.+)/)
   async acceptRequest(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
+    if (!(await this.ensureActiveOnboardedResident(ctx))) return;
     const match =
       ctx.callbackQuery && "data" in ctx.callbackQuery
         ? ctx.callbackQuery.data.match(/carpool_manage:accept:(.+)/)
@@ -120,6 +122,7 @@ export class AppUpdate {
   @Action(/carpool_manage:decline:(.+)/)
   async declineRequest(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
+    if (!(await this.ensureActiveOnboardedResident(ctx))) return;
     const match =
       ctx.callbackQuery && "data" in ctx.callbackQuery
         ? ctx.callbackQuery.data.match(/carpool_manage:decline:(.+)/)
@@ -133,6 +136,7 @@ export class AppUpdate {
   @Action(/carpool_ride:choose:(.+)/)
   async chooseMultipleAccepts(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
+    if (!(await this.ensureActiveOnboardedResident(ctx))) return;
     const match =
       ctx.callbackQuery && "data" in ctx.callbackQuery
         ? ctx.callbackQuery.data.match(/carpool_ride:choose:(.+)/)
@@ -151,6 +155,7 @@ export class AppUpdate {
 
   @On("message")
   async onMessage(@Ctx() ctx: BotContext) {
+    if (!(await this.ensureActiveOnboardedResident(ctx))) return;
     const message = ctx.message as any;
     if (message?.location) {
       const { latitude, longitude, live_period } = message.location;

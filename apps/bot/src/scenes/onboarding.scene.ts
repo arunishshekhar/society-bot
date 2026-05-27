@@ -30,17 +30,8 @@ export class OnboardingScene {
 
   @Command(["ask", "menu", "exit"])
   async onAskCommand(@Ctx() ctx: BotContext) {
-    const text = (ctx.message as { text?: string })?.text ?? "";
-
-    if (text.startsWith("/menu") || text.startsWith("/exit")) {
-      await ctx.scene.leave();
-      await ctx.reply("Society Bot", mainMenuKeyboard());
-      return;
-    }
-
-    const query = text.replace(/^\/ask\s*/i, "").trim();
-    await ctx.scene.leave();
-    await this.searchService.handleAsk(ctx, query);
+    await ctx.reply("Please complete your registration first to access other features.");
+    await this.promptForCurrentStep(ctx);
   }
 
   @On("text")
