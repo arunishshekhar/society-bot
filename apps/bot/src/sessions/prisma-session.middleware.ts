@@ -1,6 +1,6 @@
-import type { InputJsonValue } from '@prisma/client/runtime/library';
-import { PrismaService } from '../prisma/prisma.service';
-import { BotContext, BotSession } from '../types/bot-context';
+import type { InputJsonValue } from "@prisma/client/runtime/library";
+import { PrismaService } from "../prisma/prisma.service";
+import { BotContext, BotSession } from "../types/bot-context";
 
 export function createPrismaSessionMiddleware(prisma: PrismaService) {
   return async (ctx: BotContext, next: () => Promise<void>) => {

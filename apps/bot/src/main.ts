@@ -1,8 +1,8 @@
-import 'dotenv/config';
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { getBotToken } from 'nestjs-telegraf';
-import { Telegraf } from 'telegraf';
+import "dotenv/config";
+import { NestFactory } from "@nestjs/core";
+import { AppModule } from "./app.module";
+import { getBotToken } from "nestjs-telegraf";
+import { Telegraf } from "telegraf";
 
 // BigInt (telegramId) can't be serialized by JSON.stringify by default.
 // Patch it globally so admin API responses don't 500.
@@ -11,7 +11,7 @@ import { Telegraf } from 'telegraf';
   return this.toString();
 };
 
-const HOOK_PATH = '/telegram-webhook';
+const HOOK_PATH = "/telegram-webhook";
 const RETRIES = 5;
 const RETRY_DELAY_MS = 8000;
 
@@ -51,7 +51,9 @@ async function bootstrap() {
       }
 
       await app.listen(process.env.PORT ?? 3001);
-      console.log(`Bot started on attempt ${attempt} (mode: ${webhookDomain ? 'webhook' : 'polling'})`);
+      console.log(
+        `Bot started on attempt ${attempt} (mode: ${webhookDomain ? "webhook" : "polling"})`,
+      );
       return;
     } catch (err) {
       const isLast = attempt === RETRIES;
@@ -59,7 +61,7 @@ async function bootstrap() {
         `[bootstrap] Attempt ${attempt}/${RETRIES} failed: ${(err as Error).message}`,
       );
       if (isLast) {
-        console.error('[bootstrap] All retries exhausted. Exiting.');
+        console.error("[bootstrap] All retries exhausted. Exiting.");
         process.exit(1);
       }
       console.log(`[bootstrap] Retrying in ${RETRY_DELAY_MS / 1000}s...`);
@@ -69,4 +71,3 @@ async function bootstrap() {
 }
 
 void bootstrap();
-

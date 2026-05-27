@@ -1,4 +1,4 @@
-import { BotContext } from '../types/bot-context';
+import { BotContext } from "../types/bot-context";
 
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 
@@ -38,7 +38,7 @@ export function createIdleTimeoutMiddleware() {
         // Notify the user only on text/command messages (not callbacks)
         if (ctx.message) {
           await ctx.reply(
-            '⏱ Your session timed out after 2 minutes of inactivity.\n\nUse /menu to start fresh or /ask to search.',
+            "⏱ Your session timed out after 2 minutes of inactivity.\n\nUse /menu to start fresh or /ask to search.",
           );
         }
       }

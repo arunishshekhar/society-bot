@@ -127,7 +127,7 @@ export async function updateCarpoolAction(formData: FormData) {
   const id = String(formData.get('id'));
   const seats = formData.get('seatsAvailable');
   await apiFetch(`/admin/carpool/${id}`, 'PATCH', {
-    destination: formData.get('destination') || undefined,
+    destinationAddress: formData.get('destinationAddress') || undefined,
     departureTime: formData.get('departureTime') || undefined,
     returnTime: formData.get('returnTime') || null,
     seatsAvailable: seats ? Number(seats) : undefined,

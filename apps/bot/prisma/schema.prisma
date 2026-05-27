@@ -22,6 +22,7 @@ model Resident {
   workerRecs           WorkerRecommendation[]
   microService         MicroService?
   carpoolRoutes        CarpoolRoute[]
+  carpoolRequests      CarpoolRequest[]
 }
 
 model Vehicle {
@@ -67,18 +68,101 @@ model MicroService {
 }
 
 model CarpoolRoute {
-  id             String   @id @default(uuid())
-  residentId     String
-  destination    String
-  startPoint     String?
-  departureTime  String
-  returnTime     String?
-  seatsAvailable Int
-  days           String[]
-  isPaused       Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  resident       Resident @relation(fields: [residentId], references: [id], onDelete: Cascade)
+  id                  String    @id @default(uuid())
+  residentId          String
+  type                RouteType               
+  recurringDays       String[]                
+  oneTimeDate         DateTime?               
+
+  destinationAddress  String
+  destinationLat      Float
+  destinationLng      Float
+  departureTime       String                  
+  morningPolyline     String                  
+  morningDistanceKm   Float
+  morningDurationMin  Int
+  seatsAvailable      Int
+  isPaused            Boolean   @default(false)
+
+  hasReturn           Boolean   @default(false)
+  returnTime          String?
+  returnPolyline      String?
+  returnSeatsAvailable Int?
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  resident            Resident  @relation(fields: [residentId], references: [id], onDelete: Cascade)
+  requests            CarpoolRequest[]
+  rideSessions        RideSession[]
+}
+
+model CarpoolRequest {
+  id              String          @id @default(uuid())
+  routeId         String
+  seekerId        String
+  direction       Direction       
+  pickupAddress   String
+  pickupLat       Float
+  pickupLng       Float
+  distanceFromRoute Float         
+  status          RequestStatus   @default(PENDING)
+  expiresAt       DateTime
+  createdAt       DateTime        @default(now())
+  resolvedAt      DateTime?
+
+  route           CarpoolRoute    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  seeker          Resident        @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+}
+
+model RideSession {
+  id                  String      @id @default(uuid())
+  routeId             String
+  offererTelegramId   BigInt
+  direction           Direction
+  status              RideStatus  @default(ACTIVE)
+  lastLat             Float?
+  lastLng             Float?
+  startedAt           DateTime    @default(now())
+  endedAt             DateTime?
+
+  route               CarpoolRoute  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  members             RideSessionMember[]
+}
+
+model RideSessionMember {
+  id                  String   @id @default(uuid())
+  sessionId           String
+  riderTelegramId     BigInt
+  riderName           String
+  riderFlat           String
+  locationMessageId   Int       
+
+  session             RideSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+enum RouteType {
+  RECURRING
+  ONE_TIME
+}
+
+enum Direction {
+  MORNING
+  RETURN
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+enum RideStatus {
+  ACTIVE
+  COMPLETED
+  EXPIRED
 }
 
 model Category {

@@ -43,11 +43,11 @@ export default async function CarpoolPage({
               return (
                 <React.Fragment key={String(r.id)}>
                   <TableRow>
-                    <TableCell className="font-medium">{text(r.destination)}</TableCell>
+                    <TableCell className="font-medium">{text((r as any).destinationAddress)}</TableCell>
                     <TableCell>{text(r.departureTime)}</TableCell>
                     <TableCell>{text(r.returnTime)}</TableCell>
                     <TableCell>{text(r.seatsAvailable)}</TableCell>
-                    <TableCell className="max-w-[120px] truncate">{Array.isArray(r.days) ? (r.days as string[]).join(', ') : '-'}</TableCell>
+                    <TableCell className="max-w-[120px] truncate">{Array.isArray((r as any).recurringDays) ? ((r as any).recurringDays as string[]).join(', ') : '-'}</TableCell>
                     <TableCell>{text(resident?.flatNumber)}</TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -80,7 +80,7 @@ export default async function CarpoolPage({
                           <input type="hidden" name="id" value={String(r.id)} />
                           <div className="grid gap-1">
                             <label className="text-xs font-medium">Destination</label>
-                            <Input name="destination" defaultValue={text(r.destination)} placeholder="Destination" className="w-40 bg-background" />
+                            <Input name="destinationAddress" defaultValue={text((r as any).destinationAddress)} placeholder="Destination" className="w-40 bg-background" />
                           </div>
                           <div className="grid gap-1">
                             <label className="text-xs font-medium">Departure</label>

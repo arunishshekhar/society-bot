@@ -15,6 +15,7 @@
     "skipLibCheck": true,
     "strictPropertyInitialization": false,
     "moduleResolution": "node",
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "types": ["node", "multer", "jest"]
   }
 }

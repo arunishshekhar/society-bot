@@ -1,9 +1,10 @@
-import { Logger } from '@nestjs/common';
-import { Action, Command, Ctx, Start, Update } from 'nestjs-telegraf';
-import { mainMenuKeyboard } from './keyboards/main-menu.keyboard';
-import { PrismaService } from './prisma/prisma.service';
-import { SearchService } from './modules/search/search.service';
-import { BotContext } from './types/bot-context';
+import { Logger } from "@nestjs/common";
+import { Action, Command, Ctx, Start, Update, On } from "nestjs-telegraf";
+import { mainMenuKeyboard } from "./keyboards/main-menu.keyboard";
+import { PrismaService } from "./prisma/prisma.service";
+import { SearchService } from "./modules/search/search.service";
+import { BotContext } from "./types/bot-context";
+import { CarpoolService } from "./modules/carpool/carpool.service";
 
 @Update()
 export class AppUpdate {
@@ -12,18 +13,21 @@ export class AppUpdate {
   constructor(
     private readonly prisma: PrismaService,
     private readonly searchService: SearchService,
+    private readonly carpoolService: CarpoolService,
   ) {}
 
   @Start()
   async start(@Ctx() ctx: BotContext) {
-    this.logger.log(`[/start] userId=${ctx.from?.id} username=${ctx.from?.username ?? 'n/a'}`);
+    this.logger.log(
+      `[/start] userId=${ctx.from?.id} username=${ctx.from?.username ?? "n/a"}`,
+    );
     const telegramId = BigInt(ctx.from?.id ?? 0);
     const resident = await this.prisma.resident.findUnique({
       where: { telegramId },
     });
 
     if (resident && !resident.isActive) {
-      await ctx.reply('Your account is disabled. Contact the society admin.');
+      await ctx.reply("Your account is disabled. Contact the society admin.");
       return;
     }
 
@@ -32,76 +36,160 @@ export class AppUpdate {
       return;
     }
 
-    await ctx.scene.enter('onboarding');
+    await ctx.scene.enter("onboarding");
   }
 
-  @Command('menu')
+  @Command("menu")
   async menu(@Ctx() ctx: BotContext) {
     this.logger.log(`[/menu] userId=${ctx.from?.id}`);
     if (!(await this.ensureActiveOnboardedResident(ctx))) return;
     await this.showMainMenu(ctx);
   }
 
-  @Command('exit')
+  @Command("exit")
   async exit(@Ctx() ctx: BotContext) {
     this.logger.log(`[/exit] userId=${ctx.from?.id}`);
     if (!(await this.ensureActiveOnboardedResident(ctx))) return;
     await this.showMainMenu(ctx);
   }
 
-  @Command('ask')
+  @Command("ask")
   async ask(@Ctx() ctx: BotContext) {
     if (!(await this.ensureActiveOnboardedResident(ctx))) return;
-    const text = (ctx.message as { text?: string })?.text ?? '';
-    const query = text.replace(/^\/ask\s*/i, '').trim();
+    const text = (ctx.message as { text?: string })?.text ?? "";
+    const query = text.replace(/^\/ask\s*/i, "").trim();
     this.logger.log(`[/ask] userId=${ctx.from?.id} query="${query}"`);
     await this.searchService.handleAsk(ctx, query);
   }
 
-  @Action('menu:back')
+  @Action("menu:back")
   async backToMenu(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
     await ctx.scene.leave();
     await this.showMainMenu(ctx);
   }
 
-  @Action('profile:open')
+  @Action("profile:open")
   async openProfile(@Ctx() ctx: BotContext) {
-    await this.enterScene(ctx, 'profile');
+    await this.enterScene(ctx, "profile");
   }
 
-  @Action('vehicles:open')
+  @Action("vehicles:open")
   async openVehicles(@Ctx() ctx: BotContext) {
-    await this.enterScene(ctx, 'vehicles');
+    await this.enterScene(ctx, "vehicles");
   }
 
-  @Action('settings:open')
+  @Action("settings:open")
   async openSettings(@Ctx() ctx: BotContext) {
-    await this.enterScene(ctx, 'settings');
+    await this.enterScene(ctx, "settings");
   }
 
-  @Action('search:open')
+  @Action("search:open")
   async openSearch(@Ctx() ctx: BotContext) {
-    await this.enterScene(ctx, 'search');
+    await this.enterScene(ctx, "search");
   }
 
-  @Action('workers:open')
+  @Action("workers:open")
   async openWorkers(@Ctx() ctx: BotContext) {
-    await this.enterScene(ctx, 'workers');
+    await this.enterScene(ctx, "workers");
   }
 
-  @Action('services:open')
+  @Action("services:open")
   async openServices(@Ctx() ctx: BotContext) {
-    await this.enterScene(ctx, 'microservices');
+    await this.enterScene(ctx, "microservices");
   }
 
-  @Action('carpool:open')
+  @Action("carpool:open")
   async openCarpool(@Ctx() ctx: BotContext) {
-    await this.enterScene(ctx, 'carpool');
+    await this.enterScene(ctx, "carpool");
+  }
+
+  @Action(/carpool_manage:accept:(.+)/)
+  async acceptRequest(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    const match =
+      ctx.callbackQuery && "data" in ctx.callbackQuery
+        ? ctx.callbackQuery.data.match(/carpool_manage:accept:(.+)/)
+        : null;
+    const reqId = match?.[1];
+    if (reqId) {
+      await this.carpoolService.acceptRequest(reqId, ctx);
+    }
+  }
+
+  @Action(/carpool_manage:decline:(.+)/)
+  async declineRequest(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    const match =
+      ctx.callbackQuery && "data" in ctx.callbackQuery
+        ? ctx.callbackQuery.data.match(/carpool_manage:decline:(.+)/)
+        : null;
+    const reqId = match?.[1];
+    if (reqId) {
+      await this.carpoolService.declineRequest(reqId, ctx);
+    }
+  }
+
+  @Action(/carpool_ride:choose:(.+)/)
+  async chooseMultipleAccepts(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    const match =
+      ctx.callbackQuery && "data" in ctx.callbackQuery
+        ? ctx.callbackQuery.data.match(/carpool_ride:choose:(.+)/)
+        : null;
+    const reqId = match?.[1];
+    if (reqId) {
+      await this.carpoolService.acceptRequest(reqId, ctx);
+      await ctx
+        .editMessageText(
+          "✅ You chose this driver! We have shared your contacts.",
+          { parse_mode: "Markdown" },
+        )
+        .catch(() => {});
+    }
+  }
+
+  @On("message")
+  async onMessage(@Ctx() ctx: BotContext) {
+    const message = ctx.message as any;
+    if (message?.location) {
+      const { latitude, longitude, live_period } = message.location;
+      if (!live_period) return;
+
+      const telegramId = ctx.from?.id;
+      if (!telegramId) return;
+
+      const session = await this.prisma.rideSession.findFirst({
+        where: {
+          offererTelegramId: BigInt(telegramId),
+          status: "ACTIVE",
+        },
+        include: { members: true },
+      });
+
+      if (!session) return;
+
+      await this.prisma.rideSession.update({
+        where: { id: session.id },
+        data: { lastLat: latitude, lastLng: longitude },
+      });
+
+      for (const member of session.members) {
+        try {
+          await ctx.telegram.editMessageLiveLocation(
+            member.riderTelegramId.toString(),
+            member.locationMessageId,
+            undefined,
+            latitude,
+            longitude,
+          );
+        } catch {}
+      }
+    }
   }
 
   private async showMainMenu(ctx: BotContext) {
-    await ctx.reply('Society Bot', mainMenuKeyboard());
+    await ctx.reply("Society Bot", mainMenuKeyboard());
   }
 
   private async enterScene(ctx: BotContext, sceneId: string) {
@@ -115,7 +203,7 @@ export class AppUpdate {
     const telegramId = ctx.from?.id;
 
     if (!telegramId) {
-      await ctx.reply('Please start the bot again.');
+      await ctx.reply("Please start the bot again.");
       return false;
     }
 
@@ -124,17 +212,17 @@ export class AppUpdate {
     });
 
     if (!resident) {
-      await ctx.scene.enter('onboarding');
+      await ctx.scene.enter("onboarding");
       return false;
     }
 
     if (!resident.isActive) {
-      await ctx.reply('Your account is disabled. Contact the society admin.');
+      await ctx.reply("Your account is disabled. Contact the society admin.");
       return false;
     }
 
     if (!resident.onboardingComplete) {
-      await ctx.scene.enter('onboarding');
+      await ctx.scene.enter("onboarding");
       return false;
     }
 

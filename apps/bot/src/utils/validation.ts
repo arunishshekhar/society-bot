@@ -12,7 +12,7 @@ export function isValidFlatNumber(value: string) {
 }
 
 export function normalizeVehicleNumber(value: string) {
-  return value.trim().replace(/\s+/g, ' ').toUpperCase();
+  return value.trim().replace(/\s+/g, " ").toUpperCase();
 }
 
 export function isValidVehicleNumber(value: string) {

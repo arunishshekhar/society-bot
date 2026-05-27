@@ -1,33 +1,38 @@
-import { Module } from '@nestjs/common';
-import { TelegrafModule } from 'nestjs-telegraf';
-import { AppUpdate } from './app.update';
-import { GroupMemberGuard } from './guards/group-member.guard';
-import { HealthController } from './health.controller';
-import { PrismaModule } from './prisma/prisma.module';
-import { PrismaService } from './prisma/prisma.service';
-import { createPrismaSessionMiddleware } from './sessions/prisma-session.middleware';
-import { createIdleTimeoutMiddleware } from './sessions/idle-timeout.middleware';
-import { scenes } from './scenes';
-import { SearchModule } from './modules/search/search.module';
-import { AdminModule } from './modules/admin/admin.module';
+import { Module } from "@nestjs/common";
+import { TelegrafModule } from "nestjs-telegraf";
+import { AppUpdate } from "./app.update";
+import { GroupMemberGuard } from "./guards/group-member.guard";
+import { HealthController } from "./health.controller";
+import { PrismaModule } from "./prisma/prisma.module";
+import { PrismaService } from "./prisma/prisma.service";
+import { createPrismaSessionMiddleware } from "./sessions/prisma-session.middleware";
+import { createIdleTimeoutMiddleware } from "./sessions/idle-timeout.middleware";
+import { scenes } from "./scenes";
+import { SearchModule } from "./modules/search/search.module";
+import { AdminModule } from "./modules/admin/admin.module";
+import { CarpoolModule } from "./modules/carpool/carpool.module";
 
 @Module({
   imports: [
     PrismaModule,
     SearchModule,
     AdminModule,
+    CarpoolModule,
     TelegrafModule.forRootAsync({
       imports: [PrismaModule],
       inject: [PrismaService],
       useFactory: (prisma: PrismaService) => ({
-        token: process.env.TELEGRAM_BOT_TOKEN ?? '',
-        middlewares: [createPrismaSessionMiddleware(prisma), createIdleTimeoutMiddleware()],
+        token: process.env.TELEGRAM_BOT_TOKEN ?? "",
+        middlewares: [
+          createPrismaSessionMiddleware(prisma),
+          createIdleTimeoutMiddleware(),
+        ],
         include: [AppModule],
         launchOptions: process.env.WEBHOOK_DOMAIN
           ? {
               webhook: {
                 domain: process.env.WEBHOOK_DOMAIN,
-                hookPath: '/telegram-webhook',
+                hookPath: "/telegram-webhook",
               },
             }
           : undefined,
