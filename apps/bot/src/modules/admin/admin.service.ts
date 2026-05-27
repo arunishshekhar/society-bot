@@ -213,6 +213,30 @@ export class AdminService {
     return this.prisma.category.delete({ where: { id } });
   }
 
+  // ── FAQs ───────────────────────────────────────────────────
+  faqs() {
+    return this.prisma.faq.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  createFaq(data: { question: string; answer: string }) {
+    return this.prisma.faq.create({
+      data: {
+        question: data.question,
+        answer: data.answer,
+      },
+    });
+  }
+
+  updateFaq(id: string, data: { question?: string; answer?: string }) {
+    return this.prisma.faq.update({ where: { id }, data });
+  }
+
+  deleteFaq(id: string) {
+    return this.prisma.faq.delete({ where: { id } });
+  }
+
   // ── Analytics + Broadcast ──────────────────────────────────
   async analytics() {
     const [

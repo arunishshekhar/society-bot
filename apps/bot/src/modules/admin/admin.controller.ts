@@ -276,6 +276,34 @@ export class AdminController {
     return { recipientCount: sent };
   }
 
+  // ── FAQs ───────────────────────────────────────────────────
+  @Get("faqs")
+  faqs() {
+    this.logger.log("GET /admin/faqs");
+    return this.admin.faqs();
+  }
+
+  @Post("faqs")
+  createFaq(@Body() body: { question: string; answer: string }) {
+    this.logger.log(`POST /admin/faqs question=${body.question}`);
+    return this.admin.createFaq(body);
+  }
+
+  @Patch("faqs/:id")
+  updateFaq(
+    @Param("id") id: string,
+    @Body() body: { question?: string; answer?: string },
+  ) {
+    this.logger.log(`PATCH /admin/faqs/${id}`);
+    return this.admin.updateFaq(id, body);
+  }
+
+  @Delete("faqs/:id")
+  deleteFaq(@Param("id") id: string) {
+    this.logger.log(`DELETE /admin/faqs/${id}`);
+    return this.admin.deleteFaq(id);
+  }
+
   // ── Analytics ──────────────────────────────────────────────
   @Get("analytics")
   analytics() {

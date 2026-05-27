@@ -5,6 +5,7 @@ export type SearchIntentType =
   | "find_carpool"
   | "find_return"
   | "inform"
+  | "faq"
   | "unknown";
 
 export interface SearchIntent {
@@ -95,6 +96,7 @@ function isIntentType(value: unknown): value is SearchIntentType {
     value === "find_carpool" ||
     value === "find_return" ||
     value === "inform" ||
+    value === "faq" ||
     value === "unknown"
   );
 }

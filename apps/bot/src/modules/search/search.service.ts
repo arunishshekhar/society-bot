@@ -73,6 +73,8 @@ export class SearchService {
       // We will emulate text to jump steps if needed, but scene enter will just prompt for the missing parts.
     } else if (intent.type === "inform") {
       await this.replyInform(ctx, intent);
+    } else if (intent.type === "faq") {
+      await this.replyFaq(ctx, query);
     } else {
       await ctx.reply(
         "🤔 I couldn't understand what you're looking for. Try being more specific.\n\nExamples:\n• /ask North Indian maid\n• /ask carpool MG Road Monday 8AM\n• /ask electrician",
@@ -102,7 +104,7 @@ export class SearchService {
             role: "system",
             content: `You are a housing society assistant that extracts structured search intent from resident queries.
 Classify each query and extract the following JSON fields:
-- type: "worker" | "service" | "post_carpool" | "find_carpool" | "find_return" | "inform" | "unknown"
+- type: "worker" | "service" | "post_carpool" | "find_carpool" | "find_return" | "inform" | "faq" | "unknown"
 - category: specific type of worker or service (e.g. "maid", "cook", "plumber", "tutor", "laundry")
 - keywords: array of key descriptors (e.g. ["north indian", "experienced", "full time"])
 - destination: for carpool queries, the destination location (e.g. "MG Road", "Whitefield")
@@ -287,6 +289,55 @@ Respond ONLY with valid JSON.`,
       await ctx.reply(
         "❌ Failed to send the message. They might have blocked the bot.",
       );
+    }
+  }
+
+  async replyFaq(ctx: BotContext, query: string): Promise<void> {
+    const faqs = await this.prisma.faq.findMany();
+    if (!faqs.length) {
+      await ctx.reply(
+        "😕 I don't have any answers in the society FAQ right now. Try asking an admin.",
+      );
+      return;
+    }
+
+    if (!this.groq) {
+      await ctx.reply("😕 I am unable to process FAQ queries without AI access.");
+      return;
+    }
+
+    try {
+      const faqContext = faqs
+        .map((faq) => `Q: ${faq.question}\nA: ${faq.answer}`)
+        .join("\n\n");
+
+      const response = await this.groq.chat.completions.create({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          {
+            role: "system",
+            content: `You are a helpful assistant for our housing society. Answer the resident's query using ONLY the provided FAQ data. 
+If the answer is not in the FAQ, politely state that you do not have information about that in the society guidelines. Do not make up answers. Keep responses concise and friendly.
+
+FAQ Data:
+${faqContext}`,
+          },
+          {
+            role: "user",
+            content: query,
+          },
+        ],
+        max_tokens: 300,
+      });
+
+      const answer = response.choices[0]?.message?.content?.trim();
+      if (answer) {
+        await ctx.reply(answer);
+      } else {
+        await ctx.reply("😕 I couldn't find an answer to that right now.");
+      }
+    } catch {
+      await ctx.reply("😕 Sorry, I encountered an error while searching the FAQ.");
     }
   }
 
