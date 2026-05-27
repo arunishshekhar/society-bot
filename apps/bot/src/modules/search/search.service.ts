@@ -66,13 +66,9 @@ export class SearchService {
       ctx.session.carpool = {
         searchDirection: direction,
         searchDraft: {
-          pickupAddress: intent.destination,
+          destinationText: intent.destination,
         },
-        step: intent.time
-          ? "time_filter"
-          : intent.destination
-            ? "pickup_location"
-            : undefined,
+        step: "pickup_location", // Always start by asking for pickup location
       };
       await ctx.scene.enter("carpool_search");
       // If we already had everything, we'd trigger the next step. For simplicity, just enter the scene.
@@ -164,6 +160,9 @@ Respond ONLY with valid JSON.`,
         { tags: { has: kw } },
         { name: { contains: kw, mode: "insensitive" as const } },
         { category: { contains: kw, mode: "insensitive" as const } },
+        { phone: { contains: kw } },
+        { resident: { name: { contains: kw, mode: "insensitive" as const } } },
+        { resident: { flatNumber: { contains: kw, mode: "insensitive" as const } } },
       ]),
     ];
 
@@ -211,6 +210,8 @@ Respond ONLY with valid JSON.`,
         { name: { contains: kw, mode: "insensitive" as const } },
         { description: { contains: kw, mode: "insensitive" as const } },
         { category: { contains: kw, mode: "insensitive" as const } },
+        { resident: { name: { contains: kw, mode: "insensitive" as const } } },
+        { resident: { flatNumber: { contains: kw, mode: "insensitive" as const } } },
       ]),
     ];
 

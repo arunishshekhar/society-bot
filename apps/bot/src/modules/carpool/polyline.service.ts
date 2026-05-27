@@ -18,12 +18,21 @@ export class PolylineService {
     seekerLng: number,
     requestedTime: string | null,
     direction: Direction,
+    destinationQuery?: string | null,
   ): Promise<MatchResult[]> {
     const routes = await this.prisma.carpoolRoute.findMany({
       where: {
         isPaused: false,
         ...(direction === "RETURN" ? { hasReturn: true } : {}),
         seatsAvailable: { gt: 0 },
+        ...(destinationQuery
+          ? {
+              destinationAddress: {
+                contains: destinationQuery,
+                mode: "insensitive",
+              },
+            }
+          : {}),
       },
       include: { resident: true },
     });

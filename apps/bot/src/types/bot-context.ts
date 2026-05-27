@@ -105,6 +105,7 @@ export interface BotSession extends Scenes.SceneSession<BotSceneSessionData> {
       returnSeatsAvailable?: number | null;
     };
     searchDraft?: {
+      destinationText?: string;
       pickupAddress?: string;
       pickupLat?: number;
       pickupLng?: number;

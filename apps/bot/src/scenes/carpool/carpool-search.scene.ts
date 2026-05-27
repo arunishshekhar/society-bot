@@ -118,6 +118,7 @@ export class CarpoolSearchScene {
       draft.pickupLng!,
       time,
       direction,
+      draft.destinationText,
     );
 
     if (!results.length) {
