@@ -103,8 +103,18 @@ export class SearchService {
           {
             role: "system",
             content: `You are a housing society assistant that extracts structured search intent from resident queries.
-Classify each query and extract the following JSON fields:
-- type: "worker" | "service" | "post_carpool" | "find_carpool" | "find_return" | "inform" | "faq" | "unknown"
+Classify each query into exactly one intent type:
+- "worker": looking for a maid, cook, plumber, electrician, etc.
+- "service": looking for a tiffin service, tutor, laundry, etc.
+- "post_carpool": offering a ride or carpool.
+- "find_carpool": looking for a ride or carpool.
+- "find_return": looking for a return ride.
+- "inform": ONLY for sending a direct message/notification to a specific flat owner or vehicle owner (e.g., "tell flat 203 to move their car").
+- "faq": general questions about society rules, amenities, groups, timings, or general information (e.g., "is there a sports group?", "gym timings?").
+- "unknown": if the query doesn't fit any of the above.
+
+Extract the following JSON fields based on the chosen type:
+- type: the chosen intent string
 - category: specific type of worker or service (e.g. "maid", "cook", "plumber", "tutor", "laundry")
 - keywords: array of key descriptors (e.g. ["north indian", "experienced", "full time"])
 - destination: for carpool queries, the destination location (e.g. "MG Road", "Whitefield")
@@ -112,9 +122,9 @@ Classify each query and extract the following JSON fields:
 - isRecurring: true | false (for carpool)
 - recurringType: "weekday" | "weekend" | "both" | null (for carpool)
 - date: "YYYY-MM-DD" if specific date mentioned or null (for carpool)
-- target_type: for inform queries, "vehicle" or "flat"
-- target_id: for inform queries, the flat or vehicle number (e.g. "KA12AS2322", "03-12-03")
-- message: for inform queries, the message to relay
+- target_type: for inform queries ONLY, "vehicle" or "flat"
+- target_id: for inform queries ONLY, the flat or vehicle number (e.g. "KA12AS2322", "03-12-03")
+- message: for inform queries ONLY, the message to relay
 
 Respond ONLY with valid JSON.`,
           },
@@ -387,6 +397,10 @@ ${faqContext}`,
       )
     ) {
       return { type: "worker", keywords };
+    }
+
+    if (/(what|when|how|is there|rules|timings|group|society|faq)/.test(lower)) {
+      return { type: "faq", keywords };
     }
 
     return { type: "unknown", keywords };
