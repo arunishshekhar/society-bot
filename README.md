@@ -154,7 +154,8 @@ pnpm dev:dashboard
 ### `apps/bot/.env`
 
 ```env
-DATABASE_URL=""                  # Neon PostgreSQL connection string
+DATABASE_URL=""                  # Neon PostgreSQL pooled connection string (e.g. includes -pooler and ?pgbouncer=true)
+DIRECT_URL=""                    # Neon PostgreSQL direct connection string (required for Prisma migrations)
 TELEGRAM_BOT_TOKEN=""            # From @BotFather
 TELEGRAM_GROUP_ID=""             # Numeric group ID (negative number, e.g. -1001234567890)
 TELEGRAM_GROUP_INVITE_LINK=""    # https://t.me/+xxxxxxx
@@ -188,6 +189,7 @@ The repo includes `render.yaml` which configures the build automatically. When c
 1. Create a new **Web Service** on [render.com](https://render.com)
 2. Connect this GitHub repo — Render will detect `render.yaml`
 3. Add all environment variables from `apps/bot/.env` in the Render dashboard (Environment tab)
+   > **Note on Neon Postgres**: Ensure `DATABASE_URL` is the pooled connection string (with `?pgbouncer=true`) and `DIRECT_URL` is the unpooled direct connection string. Render runs `prisma migrate deploy` which requires the `DIRECT_URL`.
 4. After first deploy, set `WEBHOOK_DOMAIN` to your Render URL (e.g. `https://society-bot-xxxx.onrender.com`) and redeploy
 
 **Build command** (from `render.yaml`):
