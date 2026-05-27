@@ -51,7 +51,7 @@ export class OrsService {
             (f.properties.summary.distance / 1000).toFixed(1),
           ),
           durationMin: Math.round(f.properties.summary.duration / 60),
-          encodedPolyline: f.properties.way_points ?? f.geometry,
+          encodedPolyline: f.geometry,
         };
       });
     } catch (error) {
