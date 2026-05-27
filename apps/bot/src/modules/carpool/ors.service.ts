@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import axios from "axios";
+import polyline from "@mapbox/polyline";
 
 export interface OrsRoute {
   index: number;
@@ -44,6 +45,17 @@ export class OrsService {
         const stepName = f.properties.segments?.[0]?.steps?.find(
           (s: any) => s.type === 11,
         )?.name;
+        let encodedStr = "";
+        if (typeof f.geometry === "string") {
+          encodedStr = f.geometry;
+        } else if (f.geometry && Array.isArray(f.geometry.coordinates)) {
+          const coords = f.geometry.coordinates.map((c: number[]) => [c[1], c[0]]);
+          encodedStr = polyline.encode(coords);
+        } else if (Array.isArray(f.geometry)) {
+          const coords = f.geometry.map((c: number[]) => [c[1], c[0]]);
+          encodedStr = polyline.encode(coords);
+        }
+
         return {
           index: i + 1,
           summary: stepName || `Route ${i + 1}`,
@@ -51,7 +63,7 @@ export class OrsService {
             (f.properties.summary.distance / 1000).toFixed(1),
           ),
           durationMin: Math.round(f.properties.summary.duration / 60),
-          encodedPolyline: f.geometry,
+          encodedPolyline: encodedStr,
         };
       });
     } catch (error) {
