@@ -12,9 +12,6 @@ importers:
         specifier: ^2.1.1
         version: 2.1.1
     devDependencies:
-      '@types/cron':
-        specifier: ^2.4.3
-        version: 2.4.3
       '@types/multer':
         specifier: ^2.1.0
         version: 2.1.0
@@ -48,6 +45,9 @@ importers:
       axios:
         specifier: ^1.16.1
         version: 1.16.1
+      cron:
+        specifier: ^4.4.0
+        version: 4.4.0
       dotenv:
         specifier: latest
         version: 17.4.2
@@ -79,9 +79,6 @@ importers:
       '@nestjs/testing':
         specifier: latest
         version: 11.1.24(@nestjs/common@11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.24)(@nestjs/platform-express@11.1.24)
-      '@types/cron':
-        specifier: ^2.4.3
-        version: 2.4.3
       '@types/jest':
         specifier: latest
         version: 30.0.0
@@ -1369,10 +1366,6 @@ packages:
 
   '@types/connect@3.4.38':
     resolution: {integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==}
-
-  '@types/cron@2.4.3':
-    resolution: {integrity: sha512-ViRBkoZD9Rk0hGeMdd2GHGaOaZuH9mDmwsE5/Zo53Ftwcvh7h9VJc8lIt2wdgEwS4EW5lbtTX6vlE0idCLPOyA==}
-    deprecated: This is a stub types definition. cron provides its own type definitions, so you do not need this installed.
 
   '@types/eslint-scope@3.7.7':
     resolution: {integrity: sha512-MzMFlSLBqNF2gcHWO0G1vP/YQyfvrxZ0bF+u7mzUdZ1/xK4A4sru+nraZz5i3iEIk1l1uyicaDVTB4QbbEkAYg==}
@@ -5855,10 +5848,6 @@ snapshots:
   '@types/connect@3.4.38':
     dependencies:
       '@types/node': 25.9.1
-
-  '@types/cron@2.4.3':
-    dependencies:
-      cron: 4.4.0
 
   '@types/eslint-scope@3.7.7':
     dependencies:
