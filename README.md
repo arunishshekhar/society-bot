@@ -11,7 +11,7 @@ A Telegram-based management system for housing societies. Residents interact ent
 - **Worker Recommendations** — Add and discover plumbers, electricians, maids and more; rated by residents
 - **Micro-Services Directory** — List and browse resident-run home businesses (tiffin, tutoring, laundry)
 - **Carpool Matching** — Post and find commute routes by destination, days, and timing
-- **AI Search (`/ask`)** — Natural language search across workers, services, and carpools via Groq (llama-3.1-8b-instant); falls back to keyword search if Groq is unavailable
+- **AI Search & FAQ (`/ask`)** — Natural language search across workers, services, carpools, and society FAQs via Groq (llama-3.1-8b-instant); falls back to keyword search if Groq is unavailable
 - **Admin Dashboard** — Manage residents, moderate content, broadcast announcements, view analytics
 - **Access Control** — Telegram group membership as single source of truth; no manual verification
 
@@ -24,7 +24,8 @@ A Telegram-based management system for housing societies. Residents interact ent
 | Bot runtime | NestJS + nestjs-telegraf |
 | Database | PostgreSQL (Neon) + Prisma ORM |
 | AI | Groq API (llama-3.1-8b-instant) |
-| Admin UI | Next.js 15 (App Router) + Tailwind CSS |
+| Routing API | OpenRouteService (ORS) for carpool polylines/distance |
+| Admin UI | Next.js 15 (App Router) + Tailwind CSS + shadcn/ui |
 | Backend hosting | Render (webhook mode) |
 | Frontend hosting | Vercel |
 | Package manager | pnpm (monorepo) |
@@ -95,6 +96,7 @@ society-bot/
 /ask I need a North Indian maid
 /ask carpool to MG Road on Monday around 8AM
 /ask plumber for bathroom leak
+/ask what are the gym timings?
 /ask someone who does tiffin service
 ```
 
@@ -102,6 +104,7 @@ The AI (Groq) extracts structured intent from the query, then filters the databa
 - **Workers**: matches `category`, `notes`, `tags`, `name`
 - **Services**: matches `name`, `description`, `category`
 - **Carpool**: matches `destination` (ILIKE), `days` (array contains)
+- **FAQ**: Answers directly using `Faq` database entries as LLM context
 
 Falls back to keyword regex matching if Groq is unavailable.
 
@@ -160,6 +163,10 @@ ADMIN_TELEGRAM_IDS=""            # Comma-separated Telegram user IDs for admin a
 ADMIN_API_KEY=""                 # Random secret: openssl rand -hex 32
 ADMIN_PASSWORD=""                # Dashboard login password
 GROQ_API_KEY=""                  # From console.groq.com (free tier available)
+ORS_API_KEY=""                   # From openrouteservice.org (free tier available)
+SOCIETY_LAT=""                   # Society latitude for carpool routing
+SOCIETY_LNG=""                   # Society longitude for carpool routing
+SOCIETY_ADDRESS=""               # Formatted society address
 ```
 
 ### `apps/dashboard/.env.local`
@@ -228,17 +235,18 @@ Accessible at your Vercel URL. Protected by a password set via `ADMIN_PASSWORD`.
 | Workers | View, add, edit, ban/unban worker entries |
 | Services | View, add, edit, disable micro-services |
 | Carpool | View and manage carpool routes |
+| FAQs | View, add, edit, delete society FAQs for the AI bot |
 | Broadcast | Send a message to all active residents via the bot |
 | Analytics | Overview stats (residents, services, carpools, workers) |
 
 ---
 
-## Access Control
+## Access Control & Security
 
-Access is controlled by Telegram group membership. There is no manual approval process.
+Access is strictly controlled by Telegram group membership and onboarding completion. There is no manual approval process.
 
-- Resident joins the society Telegram group → can use the bot
-- Resident leaves or is removed from the group → bot access revoked automatically on next interaction
+- **Group Membership Check**: Guarded by `GroupMemberGuard`. If a resident leaves or is removed from the Telegram group, bot access is immediately revoked.
+- **Strict Onboarding Validation**: All scenes and commands enforce that a user has successfully completed the onboarding flow (name and flat number registered). Unregistered users are forcefully redirected to the onboarding scene.
 
 ---
 

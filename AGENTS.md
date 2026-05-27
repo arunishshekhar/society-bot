@@ -45,8 +45,10 @@ Use concise imperative commits: `Add Prisma schema`, `Implement onboarding scene
 
 - Production bot mode **must** use Telegram webhooks, not polling. `WEBHOOK_DOMAIN` enables webhook mode automatically.
 - Guard every bot handler with group membership checks (`GroupMemberGuard`).
+- **Strict Onboarding Validation**: All scenes and commands must enforce that a user has successfully completed the onboarding flow. Unregistered users should be forcefully redirected to the onboarding scene.
 - Protect all admin API routes with `AdminApiKeyGuard` (`x-admin-api-key` header).
 - Dashboard routes are protected by `proxy.ts` middleware (checks `admin-session` cookie).
+- The Carpool module uses OpenRouteService (ORS) for route polyline encoding and distance calculation. Ensure `ORS_API_KEY` is present in the `.env` file and passed correctly via the `Authorization` header.
 - Never commit `.env` files or secrets. Use `.env.example` as the schema.
 
 ## Known Technical Gotchas
@@ -80,6 +82,6 @@ Changing environment variables on Vercel does **not** trigger an automatic redep
 - Save after every scene step so flows are resumable.
 - Use inline keyboard callbacks instead of text commands for actions.
 - Groq failures must fall back silently to keyword-based search (the `fallbackIntent()` method in `SearchService`).
-- The `/ask` command uses Groq to classify intent (`worker | service | carpool | unknown`) and extract structured fields (destination, days, time for carpool; category and keywords for workers/services), then queries the DB directly. Do not bypass this pattern.
+- The `/ask` command uses Groq to classify intent (`worker | service | carpool | faq | unknown`) and extract structured fields (destination, days, time for carpool; category and keywords for workers/services), then queries the DB directly. Do not bypass this pattern.
 - Admin API responses that include `Resident` records must go through the BigInt patch or the endpoint will 500.
 - The `render.yaml` in the repo root controls Render's build and start commands — update it instead of changing settings in the Render dashboard.
