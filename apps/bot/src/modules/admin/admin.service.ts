@@ -16,7 +16,7 @@ export class AdminService {
             ],
           }
         : undefined,
-      include: { vehicles: true, microService: true, carpoolRoutes: true },
+      include: { vehicles: { select: { id: true } } },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -25,10 +25,7 @@ export class AdminService {
     return this.prisma.resident.findUnique({
       where: { id },
       include: {
-        vehicles: true,
-        microService: true,
-        carpoolRoutes: true,
-        workerRecs: true,
+        vehicles: { select: { id: true } },
       },
     });
   }
@@ -54,7 +51,7 @@ export class AdminService {
     const cleanPlate = plate.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
     return this.prisma.vehicle.findMany({
       where: { number: { contains: cleanPlate, mode: "insensitive" } },
-      include: { resident: true },
+      include: { resident: { select: { name: true, flatNumber: true, phone: true } } },
     });
   }
 
@@ -62,7 +59,7 @@ export class AdminService {
   workers(category?: string) {
     return this.prisma.workerRecommendation.findMany({
       where: category ? { category } : undefined,
-      include: { resident: true },
+      include: { resident: { select: { flatNumber: true } } },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -121,7 +118,7 @@ export class AdminService {
   // ── Services ───────────────────────────────────────────────
   services() {
     return this.prisma.microService.findMany({
-      include: { resident: true },
+      include: { resident: { select: { flatNumber: true } } },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -173,7 +170,7 @@ export class AdminService {
   // ── Carpool ────────────────────────────────────────────────
   carpool() {
     return this.prisma.carpoolRoute.findMany({
-      include: { resident: true },
+      include: { resident: { select: { flatNumber: true } } },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -256,6 +253,7 @@ export class AdminService {
         where: { isActive: true, isBanned: false },
       }),
       this.prisma.resident.findMany({
+        select: { id: true, name: true, flatNumber: true },
         orderBy: { createdAt: "desc" },
         take: 10,
       }),

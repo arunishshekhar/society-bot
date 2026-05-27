@@ -1,23 +1,85 @@
 import { adminFetch, AdminRecord, text } from '../lib/admin-api';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Users, Briefcase, Car, ShieldCheck } from 'lucide-react';
+import { WorkerChart } from './worker-chart';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AnalyticsPage() {
   const analytics = await adminFetch<AdminRecord>('/admin/analytics');
+  
   const groups = (analytics?.workerGroups as AdminRecord[] | undefined) ?? [];
+  const chartData = groups.map((g) => ({
+    category: String(g.category),
+    count: Number((g._count as Record<string, number>)?.category || 0)
+  }));
+
   const recent = (analytics?.recentResidents as AdminRecord[] | undefined) ?? [];
+
+  const stats = [
+    { label: 'Total Residents', value: analytics?.totalResidents, icon: Users, color: 'text-blue-500' },
+    { label: 'Active Services', value: analytics?.activeServices, icon: Briefcase, color: 'text-emerald-500' },
+    { label: 'Active Carpools', value: analytics?.activeCarpools, icon: Car, color: 'text-amber-500' },
+    { label: 'Worker Entries', value: analytics?.workerEntries, icon: ShieldCheck, color: 'text-purple-500' },
+  ];
+
   return (
-    <main className="mx-auto max-w-6xl px-6 py-8 text-zinc-950">
-      <h1 className="text-2xl font-semibold">Analytics</h1>
-      <div className="mt-6 grid gap-3 sm:grid-cols-4">
-        {['totalResidents', 'activeServices', 'activeCarpools', 'workerEntries'].map((key) => (
-          <div key={key} className="rounded border border-zinc-200 bg-white p-4"><div className="text-sm text-zinc-500">{key}</div><div className="mt-2 text-2xl font-semibold">{text(analytics?.[key])}</div></div>
-        ))}
+    <main className="container mx-auto max-w-6xl px-4 py-8">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">Analytics Dashboard</h1>
       </div>
-      <h2 className="mt-8 font-semibold">Top Worker Categories</h2>
-      <ul className="mt-3 text-sm">{groups.map((g) => <li key={String(g.category)}>{text(g.category)}: {text((g._count as AdminRecord | undefined)?.category)}</li>)}</ul>
-      <h2 className="mt-8 font-semibold">Recent Registrations</h2>
-      <ul className="mt-3 text-sm">{recent.map((r) => <li key={String(r.id)}>{text(r.name)} - {text(r.flatNumber)}</li>)}</ul>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+        {stats.map((s, i) => {
+          const Icon = s.icon;
+          return (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{s.label}</CardTitle>
+                <Icon className={`h-4 w-4 ${s.color}`} />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{text(s.value)}</div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4">
+          <CardHeader>
+            <CardTitle>Worker Categories</CardTitle>
+            <CardDescription>Number of registered workers by category.</CardDescription>
+          </CardHeader>
+          <CardContent className="pl-2">
+            <WorkerChart data={chartData} />
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-3">
+          <CardHeader>
+            <CardTitle>Recent Registrations</CardTitle>
+            <CardDescription>Latest residents to join the bot.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recent.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No recent registrations.</p>
+            ) : (
+              <div className="space-y-4">
+                {recent.map((r, i) => (
+                  <div key={i} className="flex items-center">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium leading-none">{text(r.name)}</p>
+                      <p className="text-sm text-muted-foreground">Flat: {text(r.flatNumber)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </main>
   );
 }
