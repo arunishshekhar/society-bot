@@ -26,6 +26,12 @@ export class SearchService {
     }
 
     await ctx.sendChatAction("typing");
+
+    const answeredByFaq = await this.tryAnswerFromFaq(ctx, query);
+    if (answeredByFaq) {
+      return;
+    }
+
     const intent = await this.classifyIntent(query);
 
     if (intent.type === "worker") {
@@ -73,8 +79,6 @@ export class SearchService {
       // We will emulate text to jump steps if needed, but scene enter will just prompt for the missing parts.
     } else if (intent.type === "inform") {
       await this.replyInform(ctx, intent);
-    } else if (intent.type === "faq") {
-      await this.replyFaq(ctx, query);
     } else {
       await ctx.reply(
         "🤔 I couldn't understand what you're looking for. Try being more specific.\n\nExamples:\n• /ask North Indian maid\n• /ask carpool MG Road Monday 8AM\n• /ask electrician",
@@ -110,7 +114,6 @@ Classify each query into exactly one intent type:
 - "find_carpool": looking for a ride or carpool.
 - "find_return": looking for a return ride.
 - "inform": ONLY for sending a direct message/notification to a specific flat owner or vehicle owner (e.g., "tell flat 203 to move their car").
-- "faq": general questions about society rules, amenities, groups, timings, or general information (e.g., "is there a sports group?", "gym timings?").
 - "unknown": if the query doesn't fit any of the above.
 
 Extract the following JSON fields based on the chosen type:
@@ -302,18 +305,10 @@ Respond ONLY with valid JSON.`,
     }
   }
 
-  async replyFaq(ctx: BotContext, query: string): Promise<void> {
+  async tryAnswerFromFaq(ctx: BotContext, query: string): Promise<boolean> {
     const faqs = await this.prisma.faq.findMany();
-    if (!faqs.length) {
-      await ctx.reply(
-        "😕 I don't have any answers in the society FAQ right now. Try asking an admin.",
-      );
-      return;
-    }
-
-    if (!this.groq) {
-      await ctx.reply("😕 I am unable to process FAQ queries without AI access.");
-      return;
+    if (!faqs.length || !this.groq) {
+      return false;
     }
 
     try {
@@ -326,8 +321,11 @@ Respond ONLY with valid JSON.`,
         messages: [
           {
             role: "system",
-            content: `You are a helpful assistant for our housing society. Answer the resident's query using ONLY the provided FAQ data. 
-If the answer is not in the FAQ, politely state that you do not have information about that in the society guidelines. Do not make up answers. Keep responses concise and friendly.
+            content: `You are a helpful assistant for our housing society. 
+Check if the user's query can be answered using ONLY the provided FAQ data. 
+If it CAN be answered, provide the answer politely.
+If it CANNOT be answered by the FAQ data, you MUST respond with EXACTLY the word: NO_MATCH.
+Do not make up answers. Keep responses concise and friendly.
 
 FAQ Data:
 ${faqContext}`,
@@ -341,14 +339,14 @@ ${faqContext}`,
       });
 
       const answer = response.choices[0]?.message?.content?.trim();
-      if (answer) {
+      if (answer && answer !== "NO_MATCH" && !answer.includes("NO_MATCH")) {
         await ctx.reply(answer);
-      } else {
-        await ctx.reply("😕 I couldn't find an answer to that right now.");
+        return true;
       }
     } catch {
-      await ctx.reply("😕 Sorry, I encountered an error while searching the FAQ.");
+      // silently fallback on error
     }
+    return false;
   }
 
   // ─── Fallback ────────────────────────────────────────────────────────────────
@@ -400,7 +398,8 @@ ${faqContext}`,
     }
 
     if (/(what|when|how|is there|rules|timings|group|society|faq)/.test(lower)) {
-      return { type: "faq", keywords };
+      // handled by tryAnswerFromFaq, if it reaches here it's unknown
+      return { type: "unknown", keywords };
     }
 
     return { type: "unknown", keywords };
