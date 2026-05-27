@@ -30,11 +30,13 @@ export class OrsService {
         "https://api.openrouteservice.org/v2/directions/driving-car",
         {
           params: {
-            api_key: apiKey,
             start: `${originLng},${originLat}`,
             end: `${destLng},${destLat}`,
           },
-          headers: { Accept: "application/json" },
+          headers: { 
+            Authorization: apiKey,
+            Accept: "application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8"
+          },
         },
       );
 
