@@ -390,7 +390,6 @@ Check if the user's query can be answered using ONLY the provided FAQ data.
 If it CAN be answered, provide the answer politely.
 If it CANNOT be answered by the FAQ data, you MUST respond with EXACTLY the word: NO_MATCH.
 Do not make up answers. Keep responses concise and friendly.
-IMPORTANT: If your answer includes a phone number, format it as a Markdown tel link, e.g., [9876543210](tel:9876543210).
 
 FAQ Data:
 ${faqContext}`,
@@ -405,10 +404,18 @@ ${faqContext}`,
 
       const answer = response.choices[0]?.message?.content?.trim();
       if (answer && answer !== "NO_MATCH" && !answer.includes("NO_MATCH")) {
+        const formattedAnswer = answer.replace(
+          /(?<!\d)(?:(?:\+|00)91[\s-]?)?\d{10}(?!\d)/g,
+          (match) => {
+            const digits = match.replace(/[^0-9+]/g, '');
+            return `[${match.trim()}](tel:${digits})`;
+          }
+        );
+
         try {
-          await ctx.reply(answer, { parse_mode: "Markdown" });
+          await ctx.reply(formattedAnswer, { parse_mode: "Markdown" });
         } catch (err: any) {
-          await ctx.reply(answer);
+          await ctx.reply(formattedAnswer);
         }
         return true;
       }
