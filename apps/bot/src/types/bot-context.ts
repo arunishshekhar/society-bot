@@ -86,10 +86,8 @@ export interface BotSession extends Scenes.SceneSession<BotSceneSessionData> {
       | "destination"
       | "departureTime"
       | "returnTime"
-      | "choose_direction"
       | "pickup_location"
-      | "time_filter"
-      | "return_time_filter";
+      | "time_filter";
     searchDirection?: string;
     postDraft?: {
       startAddress?: string;
@@ -113,6 +111,9 @@ export interface BotSession extends Scenes.SceneSession<BotSceneSessionData> {
     };
     searchDraft?: {
       destinationText?: string;
+      startAddress?: string;
+      startLat?: number;
+      startLng?: number;
       pickupAddress?: string;
       pickupLat?: number;
       pickupLng?: number;

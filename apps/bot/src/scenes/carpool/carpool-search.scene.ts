@@ -13,6 +13,9 @@ import { mainMenuKeyboard } from "../../keyboards/main-menu.keyboard";
 @Scene("carpool_search")
 @UseGuards(GroupMemberGuard)
 export class CarpoolSearchScene {
+  private readonly societyLat = parseFloat(process.env.SOCIETY_LAT ?? "0");
+  private readonly societyLng = parseFloat(process.env.SOCIETY_LNG ?? "0");
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly photonService: PhotonService,
@@ -22,20 +25,18 @@ export class CarpoolSearchScene {
 
   @SceneEnter()
   async enter(@Ctx() ctx: BotContext) {
-    // Reset search state but keep any pre-set direction
-    ctx.session.carpool = { ...ctx.session.carpool, step: "choose_direction" };
+    ctx.session.carpool = {
+      ...ctx.session.carpool,
+      step: "start",
+      searchDraft: {},
+    };
 
     await ctx.reply(
-      "🔍 *Find a Pool*\n\nAre you looking for a morning or return ride?",
+      "🔍 *Find a Pool*\n\nWhere are you starting from?\nType the location name or select below.",
       {
         parse_mode: "Markdown",
         reply_markup: Markup.inlineKeyboard([
-          [
-            Markup.button.callback("🌅 Morning (Home → Work)", "carpool_search:dir:MORNING"),
-          ],
-          [
-            Markup.button.callback("🏠 Return (Work → Home)", "carpool_search:dir:RETURN"),
-          ],
+          [Markup.button.callback("🏢 The Society Location", "carpool_search:start_society")],
           [Markup.button.callback("🔙 Back", "carpool_search:cancel")],
         ]).reply_markup,
       },
@@ -57,24 +58,39 @@ export class CarpoolSearchScene {
     await this.searchService.handleAsk(ctx, query);
   }
 
-  @Action(/carpool_search:dir:(MORNING|RETURN)/)
-  async chooseDirection(@Ctx() ctx: BotContext) {
-    await ctx.answerCbQuery();
-    const match =
-      ctx.callbackQuery && "data" in ctx.callbackQuery
-        ? ctx.callbackQuery.data.match(/carpool_search:dir:(MORNING|RETURN)/)
-        : null;
-    if (!match) return;
-    const direction = match[1] as Direction;
-    ctx.session.carpool!.searchDirection = direction;
-    ctx.session.carpool!.step = "pickup_location";
+  // ─── Society shortcut buttons ────────────────────────────────────────────────
 
-    if (direction === "MORNING") {
-      await ctx.reply("Where should they pick you up?\nType your pickup location.");
-    } else {
-      await ctx.reply("Where are you returning from?\nType your current location.");
-    }
+  @Action("carpool_search:start_society")
+  async setStartSociety(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    ctx.session.carpool!.searchDraft = {
+      ...ctx.session.carpool!.searchDraft,
+      startAddress: "The Society Location",
+      startLat: this.societyLat,
+      startLng: this.societyLng,
+    };
+    ctx.session.carpool!.step = "pickup_location"; // "pickup_location" = destination step in search
+    await ctx.reply(
+      "Where are you going?\nType the destination name or select below.",
+      Markup.inlineKeyboard([
+        [Markup.button.callback("🏢 The Society Location", "carpool_search:dest_society")],
+      ]),
+    );
   }
+
+  @Action("carpool_search:dest_society")
+  async setDestSociety(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    ctx.session.carpool!.searchDraft = {
+      ...ctx.session.carpool!.searchDraft,
+      pickupAddress: "The Society Location",
+      pickupLat: this.societyLat,
+      pickupLng: this.societyLng,
+    };
+    await this.askTime(ctx);
+  }
+
+  // ─── Text handler ─────────────────────────────────────────────────────────────
 
   @On("text")
   async onText(@Ctx() ctx: BotContext) {
@@ -82,7 +98,8 @@ export class CarpoolSearchScene {
     const text = ctx.text?.trim();
     if (!step || !text) return;
 
-    if (step === "pickup_location") {
+    if (step === "start") {
+      // Searching for start location
       const results = await this.photonService.search(text);
       if (!results.length) {
         await ctx.reply("No results found. Please try another name.");
@@ -93,19 +110,36 @@ export class CarpoolSearchScene {
       const buttons = results.map((r, i) => [
         Markup.button.callback(
           `${i + 1}. ${r.name}, ${r.address}`.substring(0, 60),
-          `carpool_search:place:${i}`,
+          `carpool_search:place_start:${i}`,
         ),
       ]);
       await ctx.reply(
-        "Select your location:",
+        "Select your starting location:",
         Markup.inlineKeyboard([
           ...buttons,
-          [
-            Markup.button.callback(
-              "Not listed, type again",
-              "carpool_search:retry_loc",
-            ),
-          ],
+          [Markup.button.callback("Not listed, type again", "carpool_search:retry_start")],
+        ]),
+      );
+    } else if (step === "pickup_location") {
+      // Searching for destination/end location
+      const results = await this.photonService.search(text);
+      if (!results.length) {
+        await ctx.reply("No results found. Please try another name.");
+        return;
+      }
+      ctx.session.carpool!.placeResults = results;
+
+      const buttons = results.map((r, i) => [
+        Markup.button.callback(
+          `${i + 1}. ${r.name}, ${r.address}`.substring(0, 60),
+          `carpool_search:place_dest:${i}`,
+        ),
+      ]);
+      await ctx.reply(
+        "Select your destination:",
+        Markup.inlineKeyboard([
+          ...buttons,
+          [Markup.button.callback("Not listed, type again", "carpool_search:retry_dest")],
         ]),
       );
     } else if (step === "time_filter") {
@@ -118,32 +152,43 @@ export class CarpoolSearchScene {
       }
       const time = text.toLowerCase() === "any" ? null : text;
       await this.findMatches(ctx, time);
-    } else if (step === "return_time_filter") {
-      if (
-        text.toLowerCase() !== "any" &&
-        !text.match(/\d{1,2}:\d{2}\s*(AM|PM)/i)
-      ) {
-        await ctx.reply('Please use format like 6:00 PM or type "any"');
-        return;
-      }
-      const time = text.toLowerCase() === "any" ? null : text;
-      await this.findMatches(ctx, time);
     }
   }
 
-  @Action("carpool_search:retry_loc")
-  async retryLoc(@Ctx() ctx: BotContext) {
+  // ─── Retry buttons ────────────────────────────────────────────────────────────
+
+  @Action("carpool_search:retry_start")
+  async retryStart(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
-    ctx.session.carpool!.step = "pickup_location";
-    await ctx.reply("Type the location name again.");
+    ctx.session.carpool!.step = "start";
+    await ctx.reply(
+      "Type your starting location again.",
+      Markup.inlineKeyboard([
+        [Markup.button.callback("🏢 The Society Location", "carpool_search:start_society")],
+      ]),
+    );
   }
 
-  @Action(/carpool_search:place:\d+/)
-  async selectPlace(@Ctx() ctx: BotContext) {
+  @Action("carpool_search:retry_dest")
+  async retryDest(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    ctx.session.carpool!.step = "pickup_location";
+    await ctx.reply(
+      "Type your destination again.",
+      Markup.inlineKeyboard([
+        [Markup.button.callback("🏢 The Society Location", "carpool_search:dest_society")],
+      ]),
+    );
+  }
+
+  // ─── Place selection ─────────────────────────────────────────────────────────
+
+  @Action(/carpool_search:place_start:\d+/)
+  async selectStart(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
     const match =
       ctx.callbackQuery && "data" in ctx.callbackQuery
-        ? ctx.callbackQuery.data.match(/carpool_search:place:(\d+)/)
+        ? ctx.callbackQuery.data.match(/carpool_search:place_start:(\d+)/)
         : null;
     if (!match) return;
     const index = parseInt(match[1]);
@@ -151,37 +196,79 @@ export class CarpoolSearchScene {
     if (!place) return;
 
     ctx.session.carpool!.searchDraft = {
+      ...ctx.session.carpool!.searchDraft,
+      startAddress: place.name,
+      startLat: place.lat,
+      startLng: place.lng,
+    };
+    ctx.session.carpool!.step = "pickup_location";
+    await ctx.reply(
+      "Where are you going?\nType the destination name or select below.",
+      Markup.inlineKeyboard([
+        [Markup.button.callback("🏢 The Society Location", "carpool_search:dest_society")],
+      ]),
+    );
+  }
+
+  @Action(/carpool_search:place_dest:\d+/)
+  async selectDest(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    const match =
+      ctx.callbackQuery && "data" in ctx.callbackQuery
+        ? ctx.callbackQuery.data.match(/carpool_search:place_dest:(\d+)/)
+        : null;
+    if (!match) return;
+    const index = parseInt(match[1]);
+    const place = ctx.session.carpool?.placeResults?.[index];
+    if (!place) return;
+
+    ctx.session.carpool!.searchDraft = {
+      ...ctx.session.carpool!.searchDraft,
+      pickupAddress: place.name,
       pickupLat: place.lat,
       pickupLng: place.lng,
-      pickupAddress: place.name,
     };
-
-    const direction = ctx.session.carpool!.searchDirection as Direction;
-    if (direction === "MORNING") {
-      ctx.session.carpool!.step = "time_filter";
-      await ctx.reply(
-        '🕐 Around what time should they pick you up?\n(e.g. 8:00 AM or type "any" for any time)',
-      );
-    } else {
-      ctx.session.carpool!.step = "return_time_filter";
-      await ctx.reply(
-        '🕐 Around what time do you want to return?\n(e.g. 6:00 PM or type "any" for any time)',
-      );
-    }
+    await this.askTime(ctx);
   }
+
+  // ─── Time prompt ──────────────────────────────────────────────────────────────
+
+  private async askTime(ctx: BotContext) {
+    ctx.session.carpool!.step = "time_filter";
+    await ctx.reply(
+      '🕐 Around what time?\n(e.g. 8:00 AM or type "any" for any time)',
+    );
+  }
+
+  // ─── Route matching ───────────────────────────────────────────────────────────
 
   async findMatches(ctx: BotContext, time: string | null) {
     const draft = ctx.session.carpool!.searchDraft!;
-    const direction = ctx.session.carpool!.searchDirection as Direction;
+
+    // Infer direction: if start ≈ society → they're going out (MORNING),
+    // if destination ≈ society → they're coming home (RETURN).
+    // Default to MORNING when unclear (search both morningPolyline only as fallback).
+    const direction = this.inferDirection(
+      draft.startLat,
+      draft.startLng,
+      draft.pickupLat,
+      draft.pickupLng,
+    );
+
+    // For the polyline proximity check, the "seeker location" is always the
+    // non-society end — so the point that must lie on the route.
+    // For MORNING: seeker is picked up from start → check startLat/Lng.
+    // For RETURN:  seeker is picked up from destination (work) → check pickupLat/Lng.
+    const seekerLat = direction === "MORNING" ? draft.startLat! : draft.pickupLat!;
+    const seekerLng = direction === "MORNING" ? draft.startLng! : draft.pickupLng!;
 
     await ctx.reply("🔍 Searching for pools near you...");
 
     const results = await this.polylineService.findMatchingRoutes(
-      draft.pickupLat!,
-      draft.pickupLng!,
+      seekerLat,
+      seekerLng,
       time,
       direction,
-      draft.destinationText,
     );
 
     if (!results.length) {
@@ -206,7 +293,7 @@ export class CarpoolSearchScene {
         ? "Your pickup is on route"
         : `~${res.distanceMeters}m from route`;
 
-      let text = `${statusIcon} *${r.resident.flatNumber}* · ${r.startAddress ?? 'Society'} → ${r.destinationAddress}\n`;
+      let text = `${statusIcon} *${r.resident.flatNumber}* · ${r.startAddress ?? "Society"} → ${r.destinationAddress}\n`;
       text += `   Departs ${timeStr} · ${r.type === "RECURRING" ? "Recurring" : "One Time"} · ${seatsStr} seats\n`;
       text += `   📍 ${locStr}`;
 
@@ -233,6 +320,44 @@ export class CarpoolSearchScene {
     );
   }
 
+  /**
+   * Infer MORNING vs RETURN from the start/end coordinates.
+   * If start is near the society → going out = MORNING.
+   * If destination is near society → coming home = RETURN.
+   * Falls back to MORNING if neither is close.
+   */
+  private inferDirection(
+    startLat?: number,
+    startLng?: number,
+    destLat?: number,
+    destLng?: number,
+  ): Direction {
+    const threshold = 500; // metres
+    if (startLat && startLng) {
+      const d = this.haversine(startLat, startLng, this.societyLat, this.societyLng);
+      if (d <= threshold) return "MORNING";
+    }
+    if (destLat && destLng) {
+      const d = this.haversine(destLat, destLng, this.societyLat, this.societyLng);
+      if (d <= threshold) return "RETURN";
+    }
+    return "MORNING";
+  }
+
+  private haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371000;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  // ─── Request Pickup ───────────────────────────────────────────────────────────
+
   @Action(/carpool_search:request:(.+)/)
   async requestPickup(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
@@ -249,11 +374,21 @@ export class CarpoolSearchScene {
     });
     if (!route) return;
 
-    const direction = ctx.session.carpool!.searchDirection as Direction;
+    const draft = ctx.session.carpool?.searchDraft;
+    if (!draft) {
+      await ctx.reply("Session expired. Please start again.");
+      return ctx.scene.enter("carpool_search");
+    }
+
+    const direction = this.inferDirection(
+      draft.startLat,
+      draft.startLng,
+      draft.pickupLat,
+      draft.pickupLng,
+    );
+
     const seats =
-      direction === "MORNING"
-        ? route.seatsAvailable
-        : route.returnSeatsAvailable;
+      direction === "MORNING" ? route.seatsAvailable : route.returnSeatsAvailable;
 
     if (!seats || seats <= 0) {
       await ctx.reply("⚠️ This pool is full. No seats available.");
@@ -265,7 +400,9 @@ export class CarpoolSearchScene {
     });
     if (!seeker) return;
 
-    const draft = ctx.session.carpool!.searchDraft!;
+    const pickupAddress = direction === "MORNING" ? draft.startAddress : draft.pickupAddress;
+    const pickupLat = direction === "MORNING" ? draft.startLat : draft.pickupLat;
+    const pickupLng = direction === "MORNING" ? draft.startLng : draft.pickupLng;
 
     // Create Request
     const request = await this.prisma.carpoolRequest.create({
@@ -273,10 +410,10 @@ export class CarpoolSearchScene {
         routeId,
         seekerId: seeker.id,
         direction,
-        pickupAddress: draft.pickupAddress!,
-        pickupLat: draft.pickupLat!,
-        pickupLng: draft.pickupLng!,
-        distanceFromRoute: 0, // Simplified
+        pickupAddress: pickupAddress!,
+        pickupLat: pickupLat!,
+        pickupLng: pickupLng!,
+        distanceFromRoute: 0,
         expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 min
       },
     });
@@ -288,7 +425,6 @@ export class CarpoolSearchScene {
         data: { seatsAvailable: { decrement: 1 } },
       });
       if (updated.count === 0) {
-        // Race condition: seats exhausted between check and update
         await this.prisma.carpoolRequest.delete({ where: { id: request.id } });
         await ctx.reply("⚠️ No seats available — someone else just took the last one.");
         return;
@@ -309,7 +445,7 @@ export class CarpoolSearchScene {
     try {
       await ctx.telegram.sendMessage(
         route.resident.telegramId.toString(),
-        `🙋 *Pickup Request*\n\nFlat ${seeker.flatNumber} is requesting a pickup on your route.\n\n📍 Their location: ${draft.pickupAddress}\n🗓 Direction: ${direction}\n\nDo you have space?`,
+        `🙋 *Pickup Request*\n\nFlat ${seeker.flatNumber} is requesting a pickup on your route.\n\n📍 Their pickup: ${pickupAddress}\n🗓 Direction: ${direction}\n\nDo you have space?`,
         {
           parse_mode: "Markdown",
           reply_markup: {

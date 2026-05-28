@@ -66,17 +66,13 @@ export class SearchService {
       intent.type === "find_carpool" ||
       intent.type === "find_return"
     ) {
-      const direction = intent.type === "find_return" ? "RETURN" : "MORNING";
       ctx.session.carpool = {
-        searchDirection: direction,
         searchDraft: {
           destinationText: intent.destination,
         },
-        step: "pickup_location", // Always start by asking for pickup location
+        step: "start",
       };
       await ctx.scene.enter("carpool_search");
-      // If we already had everything, we'd trigger the next step. For simplicity, just enter the scene.
-      // We will emulate text to jump steps if needed, but scene enter will just prompt for the missing parts.
     } else if (intent.type === "inform") {
       await this.replyInform(ctx, intent);
     } else if (intent.type === "rate_worker") {
