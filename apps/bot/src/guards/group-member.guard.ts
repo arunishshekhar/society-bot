@@ -1,10 +1,12 @@
-import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
+import { CanActivate, ExecutionContext, Injectable, Logger } from "@nestjs/common";
 import { Markup } from "telegraf";
 import { TelegrafExecutionContext } from "nestjs-telegraf";
 import { BotContext } from "../types/bot-context";
 
 @Injectable()
 export class GroupMemberGuard implements CanActivate {
+  private readonly logger = new Logger(GroupMemberGuard.name);
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const telegrafContext = TelegrafExecutionContext.create(context);
     const ctx = telegrafContext.getContext<BotContext>();
@@ -26,6 +28,10 @@ export class GroupMemberGuard implements CanActivate {
       const chatId = /^-?\d+$/.test(groupId) ? Number(groupId) : groupId;
       const member = await ctx.telegram.getChatMember(chatId, userId);
 
+      this.logger.debug(
+        `[GroupMemberGuard] userId=${userId} status=${member.status}`,
+      );
+
       // "restricted" members in supergroups are still valid members when
       // is_member is true. Always include it alongside the standard statuses.
       const allowedStatuses = ["member", "administrator", "creator", "restricted"];
@@ -34,14 +40,46 @@ export class GroupMemberGuard implements CanActivate {
         (member.status !== "restricted" || (member as any).is_member !== false);
 
       if (!allowed) {
+        this.logger.warn(
+          `[GroupMemberGuard] Blocking userId=${userId} — status="${member.status}"`,
+        );
         await this.replyNotMember(ctx, groupId);
       }
 
       return allowed;
     } catch (error) {
-      // getChatMember fails with "Bad Request: user not found" if the user has never 
-      // interacted with the group and is not a member.
-      // We must block them instead of falling back to true.
+      // Differentiate between two failure modes:
+      //
+      // 1. Bot lacks admin rights to call getChatMember (Telegram 403/Forbidden).
+      //    Fail-open — the DB resident check in ensureActiveOnboardedResident
+      //    already provides access control. Don't block legitimate users.
+      //    Fix: make the bot an admin in the group to enable real membership checks.
+      //
+      // 2. User genuinely not found in the group ("Bad Request: user not found").
+      //    Fail-closed.
+      const errMsg: string =
+        (error as any)?.response?.description ??
+        (error as any)?.message ??
+        String(error);
+
+      const isBotPermissionError =
+        errMsg.toLowerCase().includes("forbidden") ||
+        errMsg.toLowerCase().includes("not enough rights") ||
+        errMsg.toLowerCase().includes("bot is not a member") ||
+        errMsg.toLowerCase().includes("chat not found");
+
+      if (isBotPermissionError) {
+        this.logger.warn(
+          `[GroupMemberGuard] getChatMember failed — bot likely not an admin ` +
+          `in the group. Failing open for userId=${userId}. Error: ${errMsg}`,
+        );
+        return true;
+      }
+
+      // User was not found in the group — block them.
+      this.logger.warn(
+        `[GroupMemberGuard] Blocking userId=${userId} — not in group. Error: ${errMsg}`,
+      );
       await this.replyNotMember(ctx, groupId);
       return false;
     }
