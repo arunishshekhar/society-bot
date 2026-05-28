@@ -386,11 +386,16 @@ Respond ONLY with valid JSON.`,
         messages: [
           {
             role: "system",
-            content: `You are a helpful assistant for our housing society. 
-Check if the user's query can be answered using ONLY the provided FAQ data. 
-If it CAN be answered, provide the answer politely.
-If it CANNOT be answered by the FAQ data, you MUST respond with EXACTLY the word: NO_MATCH.
-Do not make up answers. Keep responses concise and friendly.
+            content: `You are a helpful assistant for our housing society.
+Check if the user's query can be answered using ONLY the provided FAQ data.
+If it CAN be answered, provide the answer politely and concisely.
+If it CANNOT be answered by the FAQ data, respond with EXACTLY: NO_MATCH
+
+IMPORTANT formatting rules:
+- If the answer contains any phone numbers, ALWAYS write them with +91 prefix and no spaces or dashes, e.g. +918105045029
+- This is critical — Telegram only makes numbers clickable when they include the +91 country code
+- Do not use markdown links like [text](tel:...) — just write the +91 number directly
+- Do not make up answers.
 
 <faq_data>
 ${faqContext}
@@ -406,19 +411,13 @@ ${faqContext}
 
       const answer = response.choices[0]?.message?.content?.trim();
       if (answer && answer !== "NO_MATCH" && !answer.includes("NO_MATCH")) {
-        const formattedAnswer = answer.replace(
-          /(?<!\d)(?:(?:\+|00)91[\s-]?)?\d{10}(?!\d)/g,
-          (match) => {
-            const digits = match.replace(/[^0-9+]/g, '');
-            return `[${match.trim()}](tel:${digits})`;
-          }
+        // Also normalise any 10-digit numbers the model forgot to prefix
+        const withPrefix = answer.replace(
+          /(?<!\+\d{1,3}[\s-]?)(?<!\d)([6-9]\d{9})(?!\d)/g,
+          "+91$1",
         );
 
-        try {
-          await ctx.reply(formattedAnswer, { parse_mode: "Markdown" });
-        } catch (err: any) {
-          await ctx.reply(formattedAnswer);
-        }
+        await ctx.reply(withPrefix, { parse_mode: "Markdown" });
         return true;
       }
     } catch {
@@ -426,6 +425,7 @@ ${faqContext}
     }
     return false;
   }
+
 
   // ─── Fallback ────────────────────────────────────────────────────────────────
 
