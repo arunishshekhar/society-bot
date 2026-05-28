@@ -115,10 +115,12 @@ if (!draft) {
 
 ## Dashboard Session Authentication
 
-- Session tokens live in `apps/dashboard/lib/sessions.ts` as `validSessions: Set<string>`.
-- `proxy.ts` must call `validSessions.has(session.value)` to validate — not just check that the cookie is non-empty.
-- The login route (`app/api/login/route.ts`) must call `validSessions.add(token)` immediately after generating the token.
-- For multi-instance or serverless deployments, replace the in-memory `Set` with a Redis or DB-backed store.
+- Session validation is **stateless** — tokens are HMAC-SHA256 signed using `apps/dashboard/lib/session-crypto.ts`.
+- `proxy.ts` (Next.js 16 middleware convention) calls `verifySessionToken(session.value)` which recomputes the HMAC using `ADMIN_PASSWORD` and verifies it cryptographically — no shared memory needed.
+- The login route (`app/api/login/route.ts`) calls `createSessionToken()` to produce a signed `<uuid>.<hmac-hex>` cookie value.
+- This approach works correctly in the **Edge Runtime** (where `proxy.ts` runs) and in the Node.js API route runtime — no in-memory `Set`, no Redis, no DB required.
+- **Do not replace `verifySessionToken` with a plain non-empty string check** — that would allow any cookie value to bypass auth.
+- For extra security: changing `ADMIN_PASSWORD` invalidates all existing sessions automatically (the HMAC signatures will no longer verify).
 
 ## Admin Worker Code Generation
 

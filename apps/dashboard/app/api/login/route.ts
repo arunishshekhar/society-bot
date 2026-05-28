@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { timingSafeEqual } from 'crypto';
-import { validSessions } from '../../../lib/sessions';
+import { createSessionToken } from '../../../lib/session-crypto';
 
 export async function POST(req: NextRequest) {
   const form = await req.formData();
@@ -23,20 +23,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=1', req.url));
   }
 
-  // Store the token server-side so the middleware can validate it.
-  const sessionToken = crypto.randomUUID();
-  validSessions.add(sessionToken);
+  // Create a stateless HMAC-signed token — works across Edge and Node.js runtimes.
+  const sessionToken = await createSessionToken();
 
   const response = NextResponse.redirect(new URL('/', req.url));
   response.cookies.set('admin-session', sessionToken, {
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
-    // Only send over HTTPS in production
     secure: process.env.NODE_ENV === 'production',
-    // Expire in 8 hours
-    maxAge: 60 * 60 * 8,
+    maxAge: 60 * 60 * 8, // 8 hours
   });
   return response;
 }
-
