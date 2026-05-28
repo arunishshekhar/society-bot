@@ -7,6 +7,7 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { PrismaService } from "./prisma/prisma.service";
 import { createPrismaSessionMiddleware } from "./sessions/prisma-session.middleware";
 import { createIdleTimeoutMiddleware } from "./sessions/idle-timeout.middleware";
+import { createPrivateChatOnlyMiddleware } from "./sessions/private-chat-only.middleware";
 import { scenes } from "./scenes";
 import { SearchModule } from "./modules/search/search.module";
 import { AdminModule } from "./modules/admin/admin.module";
@@ -26,6 +27,7 @@ import { WorkersModule } from "./modules/workers/workers.module";
       useFactory: (prisma: PrismaService) => ({
         token: process.env.TELEGRAM_BOT_TOKEN ?? "",
         middlewares: [
+          createPrivateChatOnlyMiddleware(), // must be first — drops group/channel updates
           createPrismaSessionMiddleware(prisma),
           createIdleTimeoutMiddleware(),
         ],
