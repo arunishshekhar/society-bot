@@ -304,4 +304,67 @@ export class AdminService {
       data: { message, sentBy, recipientCount },
     });
   }
+
+  // ── Lost & Found ───────────────────────────────────────────
+  foundItems(status?: string) {
+    return this.prisma.foundItem.findMany({
+      where: status ? { status: status as any } : undefined,
+      include: { reportedBy: { select: { name: true, flatNumber: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  foundItem(id: string) {
+    return this.prisma.foundItem.findUnique({
+      where: { id },
+      include: { reportedBy: true, matches: true },
+    });
+  }
+
+  resolveFoundItem(id: string) {
+    return this.prisma.foundItem.update({
+      where: { id },
+      data: { status: "RESOLVED", resolvedAt: new Date() },
+    });
+  }
+
+  deleteFoundItem(id: string) {
+    return this.prisma.foundItem.delete({ where: { id } });
+  }
+
+  lostItems(status?: string) {
+    return this.prisma.lostItem.findMany({
+      where: status ? { status: status as any } : undefined,
+      include: { reportedBy: { select: { name: true, flatNumber: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  lostItem(id: string) {
+    return this.prisma.lostItem.findUnique({
+      where: { id },
+      include: { reportedBy: true, matches: true },
+    });
+  }
+
+  resolveLostItem(id: string) {
+    return this.prisma.lostItem.update({
+      where: { id },
+      data: { status: "RESOLVED", resolvedAt: new Date() },
+    });
+  }
+
+  deleteLostItem(id: string) {
+    return this.prisma.lostItem.delete({ where: { id } });
+  }
+
+  lostFoundMatches() {
+    return this.prisma.lostFoundMatch.findMany({
+      include: {
+        foundItem: { select: { originalDescription: true } },
+        lostItem: { select: { originalDescription: true } },
+      },
+      orderBy: { notifiedAt: "desc" },
+    });
+  }
 }

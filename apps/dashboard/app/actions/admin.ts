@@ -188,3 +188,31 @@ export async function broadcastAction(formData: FormData) {
   }
 }
 
+// ── Lost & Found ───────────────────────────────────────────
+export async function resolveFoundItemAction(formData: FormData) {
+  const id = String(formData.get('id'));
+  await apiFetch(`/admin/lost-found/found/${id}/resolve`, 'PATCH');
+  revalidatePath('/lost-found');
+  redirect('/lost-found?tab=found');
+}
+
+export async function deleteFoundItemAction(formData: FormData) {
+  const id = String(formData.get('id'));
+  await apiFetch(`/admin/lost-found/found/${id}`, 'DELETE');
+  revalidatePath('/lost-found');
+  redirect('/lost-found?tab=found');
+}
+
+export async function resolveLostItemAction(formData: FormData) {
+  const id = String(formData.get('id'));
+  await apiFetch(`/admin/lost-found/lost/${id}/resolve`, 'PATCH');
+  revalidatePath('/lost-found');
+  redirect('/lost-found?tab=lost');
+}
+
+export async function deleteLostItemAction(formData: FormData) {
+  const id = String(formData.get('id'));
+  await apiFetch(`/admin/lost-found/lost/${id}`, 'DELETE');
+  revalidatePath('/lost-found');
+  redirect('/lost-found?tab=lost');
+}

@@ -124,6 +124,19 @@ export interface BotSession extends Scenes.SceneSession<BotSceneSessionData> {
   search?: {
     awaitingQuery?: boolean;
   };
+  foundItem?: {
+    fileId: string;
+    originalDescription?: string;
+    collectionLocation?: string;
+    aiDescription?: string;
+  };
+  foundItemStep?: "photo" | "description" | "location";
+  lostItem?: {
+    originalDescription?: string;
+    aiDescription?: string;
+  };
+  lostItemStep?: "description";
+
   __lastActivity?: number;
 }
 

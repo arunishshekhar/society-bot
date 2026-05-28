@@ -10,6 +10,9 @@ import { SettingsScene } from "./settings.scene";
 import { VehicleScene } from "./vehicle.scene";
 import { WorkerScene } from "./worker.scene";
 import { SearchScene } from "./search.scene";
+import { FoundReportScene } from "./lost-found/found-report.scene";
+import { LostReportScene } from "./lost-found/lost-report.scene";
+import { LostFoundManageScene } from "./lost-found/lost-found-manage.scene";
 
 export const scenes = [
   OnboardingScene,
@@ -24,4 +27,7 @@ export const scenes = [
   CarpoolManageScene,
   CarpoolRideScene,
   SearchScene,
+  FoundReportScene,
+  LostReportScene,
+  LostFoundManageScene,
 ];

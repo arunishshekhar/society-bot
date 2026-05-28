@@ -8,6 +8,7 @@ export function mainMenuKeyboard() {
     [Markup.button.callback("Worker Directory", "workers:open")],
     [Markup.button.callback("Services", "services:open")],
     [Markup.button.callback("Carpool", "carpool:open")],
+    [Markup.button.callback("📦 Lost & Found", "lost_found:open")],
     [Markup.button.callback("Settings", "settings:open")],
   ]);
 }

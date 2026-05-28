@@ -339,6 +339,61 @@ export class AdminController {
     return this.admin.deleteFaq(id);
   }
 
+  // ── Lost & Found ───────────────────────────────────────────
+  @Get("lost-found/found")
+  foundItems(@Query("status") status?: string) {
+    this.logger.log(`GET /admin/lost-found/found status=${status ?? "all"}`);
+    return this.admin.foundItems(status);
+  }
+
+  @Get("lost-found/found/:id")
+  foundItem(@Param("id") id: string) {
+    this.logger.log(`GET /admin/lost-found/found/${id}`);
+    return this.admin.foundItem(id);
+  }
+
+  @Patch("lost-found/found/:id/resolve")
+  resolveFoundItem(@Param("id") id: string) {
+    this.logger.log(`PATCH /admin/lost-found/found/${id}/resolve`);
+    return this.admin.resolveFoundItem(id);
+  }
+
+  @Delete("lost-found/found/:id")
+  deleteFoundItem(@Param("id") id: string) {
+    this.logger.log(`DELETE /admin/lost-found/found/${id}`);
+    return this.admin.deleteFoundItem(id);
+  }
+
+  @Get("lost-found/lost")
+  lostItems(@Query("status") status?: string) {
+    this.logger.log(`GET /admin/lost-found/lost status=${status ?? "all"}`);
+    return this.admin.lostItems(status);
+  }
+
+  @Get("lost-found/lost/:id")
+  lostItem(@Param("id") id: string) {
+    this.logger.log(`GET /admin/lost-found/lost/${id}`);
+    return this.admin.lostItem(id);
+  }
+
+  @Patch("lost-found/lost/:id/resolve")
+  resolveLostItem(@Param("id") id: string) {
+    this.logger.log(`PATCH /admin/lost-found/lost/${id}/resolve`);
+    return this.admin.resolveLostItem(id);
+  }
+
+  @Delete("lost-found/lost/:id")
+  deleteLostItem(@Param("id") id: string) {
+    this.logger.log(`DELETE /admin/lost-found/lost/${id}`);
+    return this.admin.deleteLostItem(id);
+  }
+
+  @Get("lost-found/matches")
+  lostFoundMatches() {
+    this.logger.log("GET /admin/lost-found/matches");
+    return this.admin.lostFoundMatches();
+  }
+
   // ── Analytics ──────────────────────────────────────────────
   @Get("analytics")
   analytics() {

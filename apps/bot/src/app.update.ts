@@ -62,6 +62,17 @@ export class AppUpdate {
     await this.searchService.handleAsk(ctx, query);
   }
 
+  @Command("found")
+  async foundCommand(@Ctx() ctx: BotContext) {
+    await this.enterScene(ctx, "found_report");
+  }
+
+  @Command("lost")
+  async lostCommand(@Ctx() ctx: BotContext) {
+    await this.enterScene(ctx, "lost_report");
+  }
+
+
   @Action("menu:back")
   async backToMenu(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
@@ -104,6 +115,68 @@ export class AppUpdate {
   async openCarpool(@Ctx() ctx: BotContext) {
     await this.enterScene(ctx, "carpool");
   }
+
+  @Action("lost_found:open")
+  async openLostFoundMenu(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    if (!(await this.ensureActiveOnboardedResident(ctx))) return;
+    await ctx.reply("📦 Lost & Found", {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "📷 I Found Something", callback_data: "lf_found" }],
+          [{ text: "🔍 I Lost Something", callback_data: "lf_lost" }],
+          [{ text: "📋 My Reports", callback_data: "lf_manage" }],
+          [{ text: "🏠 Back to Menu", callback_data: "menu:back" }],
+        ],
+      },
+    });
+  }
+
+  @Action("lf_found")
+  async lfFound(@Ctx() ctx: BotContext) {
+    await this.enterScene(ctx, "found_report");
+  }
+
+  @Action("lf_lost")
+  async lfLost(@Ctx() ctx: BotContext) {
+    await this.enterScene(ctx, "lost_report");
+  }
+
+  @Action("lf_manage")
+  async lfManage(@Ctx() ctx: BotContext) {
+    await this.enterScene(ctx, "lost_found_manage");
+  }
+
+  @Action(/lf_confirm_(.+)_(.+)/)
+  async lfConfirm(@Ctx() ctx: BotContext & { match: RegExpMatchArray }) {
+    await ctx.answerCbQuery();
+    if (!(await this.ensureActiveOnboardedResident(ctx))) return;
+    const match = ctx.match as RegExpMatchArray;
+    const foundItemId = match[1];
+    const lostItemId = match[2];
+    
+    // Lost person claims found item -> enter manage scene to show collection details
+    await this.enterScene(ctx, "lost_found_manage");
+  }
+
+  @Action(/lf_reject_(.+)_(.+)/)
+  async lfReject(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery("Okay, we will keep looking!");
+    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+  }
+
+  @Action(/lf_claim_(.+)_(.+)/)
+  async lfClaim(@Ctx() ctx: BotContext & { match: RegExpMatchArray }) {
+    await ctx.answerCbQuery();
+    if (!(await this.ensureActiveOnboardedResident(ctx))) return;
+    const match = ctx.match as RegExpMatchArray;
+    const foundItemId = match[1];
+    const lostItemId = match[2];
+    
+    // Lost person claims found item -> enter manage scene to show collection details
+    await this.enterScene(ctx, "lost_found_manage");
+  }
+
 
   @Action(/carpool_manage:accept:(.+)/)
   async acceptRequest(@Ctx() ctx: BotContext) {

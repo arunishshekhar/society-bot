@@ -13,6 +13,7 @@ import { SearchModule } from "./modules/search/search.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { CarpoolModule } from "./modules/carpool/carpool.module";
 import { WorkersModule } from "./modules/workers/workers.module";
+import { LostFoundModule } from "./modules/lost-found/lost-found.module";
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { WorkersModule } from "./modules/workers/workers.module";
     AdminModule,
     CarpoolModule,
     WorkersModule,
+    LostFoundModule,
     TelegrafModule.forRootAsync({
       imports: [PrismaModule],
       inject: [PrismaService],

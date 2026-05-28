@@ -25,6 +25,10 @@ model Resident {
   microService         MicroService?
   carpoolRoutes        CarpoolRoute[]
   carpoolRequests      CarpoolRequest[]
+  foundReports         FoundItem[]            @relation("FoundReports")
+  foundResolved        FoundItem[]            @relation("FoundResolved")
+  lostReports          LostItem[]             @relation("LostReports")
+  lostResolved         LostItem[]             @relation("LostResolved")
 }
 
 model Vehicle {
@@ -219,3 +223,60 @@ model Faq {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model FoundItem {
+  id                  String      @id @default(uuid())
+  reportedById        String
+  originalDescription String
+  aiDescription       String
+  imageFileId         String
+  collectionLocation  String
+  status              ItemStatus  @default(OPEN)
+  resolvedAt          DateTime?
+  resolvedById        String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  reportedBy          Resident    @relation("FoundReports", fields: [reportedById], references: [id])
+  resolvedBy          Resident?   @relation("FoundResolved", fields: [resolvedById], references: [id])
+  matches             LostFoundMatch[]
+
+  @@index([status])
+}
+
+model LostItem {
+  id                  String      @id @default(uuid())
+  reportedById        String
+  originalDescription String
+  aiDescription       String
+  status              ItemStatus  @default(OPEN)
+  resolvedAt          DateTime?
+  resolvedById        String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  reportedBy          Resident    @relation("LostReports", fields: [reportedById], references: [id])
+  resolvedBy          Resident?   @relation("LostResolved", fields: [resolvedById], references: [id])
+  matches             LostFoundMatch[]
+
+  @@index([status])
+}
+
+model LostFoundMatch {
+  id            String   @id @default(uuid())
+  foundItemId   String
+  lostItemId    String
+  notifiedAt    DateTime @default(now())
+  acknowledged  Boolean  @default(false)
+
+  foundItem     FoundItem @relation(fields: [foundItemId], references: [id], onDelete: Cascade)
+  lostItem      LostItem  @relation(fields: [lostItemId], references: [id], onDelete: Cascade)
+
+  @@unique([foundItemId, lostItemId])
+}
+
+enum ItemStatus {
+  OPEN
+  RESOLVED
+}
+
