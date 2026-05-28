@@ -6,14 +6,17 @@ A Telegram-based management system for housing societies. Residents interact ent
 
 ## Features
 
-- **Resident Onboarding** — Register via Telegram, step-by-step with resume support (restart anytime without losing progress)
-- **Vehicle Registry** — Register vehicles linked to resident profile; admin vehicle lookup by plate number
-- **Worker Recommendations** — Add and discover plumbers, electricians, maids and more; rated by residents
-- **Micro-Services Directory** — List and browse resident-run home businesses (tiffin, tutoring, laundry)
-- **Carpool Matching** — Post and find commute routes by destination, days, and timing
-- **AI Search & FAQ (`/ask`)** — Natural language search across workers, services, carpools, and society FAQs via Groq (llama-3.1-8b-instant); falls back to keyword search if Groq is unavailable
-- **Admin Dashboard** — Manage residents, moderate content, broadcast announcements, view analytics
-- **Access Control** — Telegram group membership as single source of truth; no manual verification
+| Feature | Description |
+|---|---|
+| **Resident Onboarding** | Step-by-step registration via Telegram with resume support (restart anytime, progress is saved) |
+| **Vehicle Registry** | Register vehicles linked to resident profile; admin vehicle lookup by plate number |
+| **Worker Recommendations** | Add, browse, and rate plumbers, electricians, maids and more; crowdsourced avg ratings |
+| **Micro-Services Directory** | List and browse resident-run home businesses (tiffin, tutoring, laundry, etc.) |
+| **Carpool Matching** | Post commute routes with polyline + timing; browse and request seats by destination/day |
+| **AI Search & FAQ (`/ask`)** | Natural language search across workers, services, carpools, and FAQs via Groq; keyword fallback |
+| **Lost & Found** | Report found/lost items with photo + AI description; automatic cross-matching with Telegram notification |
+| **Admin Dashboard** | Manage all entities, broadcast announcements, reprocess lost-found matches, view analytics |
+| **Access Control** | Telegram group membership + completed onboarding required for all bot features |
 
 ---
 
@@ -21,14 +24,16 @@ A Telegram-based management system for housing societies. Residents interact ent
 
 | Layer | Technology |
 |---|---|
-| Bot runtime | NestJS + nestjs-telegraf |
+| Bot runtime | NestJS + nestjs-telegraf (Telegraf v4) |
 | Database | PostgreSQL (Neon) + Prisma ORM |
-| AI | Groq API (llama-3.1-8b-instant) |
-| Routing API | OpenRouteService (ORS) for carpool polylines/distance |
-| Admin UI | Next.js 15 (App Router) + Tailwind CSS + shadcn/ui |
-| Backend hosting | Render (webhook mode) |
+| AI / LLM | Groq API — `llama-3.1-8b-instant` (search & lost-found enrichment), `meta-llama/llama-4-scout-17b-16e-instruct` (vision, found item description) |
+| Geocoding | Photon (komoot) — biased to society coordinates via `SOCIETY_LAT`/`SOCIETY_LNG` |
+| Routing | OpenRouteService (ORS) — carpool polylines, distance, duration |
+| Admin UI | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui |
+| Session auth | HMAC-SHA256 signed cookies via Web Crypto API (stateless, Edge Runtime compatible) |
+| Backend hosting | Render (webhook mode in production) |
 | Frontend hosting | Vercel |
-| Package manager | pnpm (monorepo) |
+| Package manager | pnpm 9 (monorepo) |
 
 ---
 
@@ -37,58 +42,135 @@ A Telegram-based management system for housing societies. Residents interact ent
 ```
 society-bot/
 ├── apps/
-│   ├── bot/                        # NestJS — Telegram bot + REST admin API
+│   ├── bot/                              # NestJS — Telegram bot + REST admin API
 │   │   ├── src/
-│   │   │   ├── app.module.ts
-│   │   │   ├── app.update.ts       # Top-level bot command handlers (/start, /menu, /ask)
-│   │   │   ├── main.ts             # Bootstrap: webhook mounting, BigInt patch, retry logic
+│   │   │   ├── app.module.ts             # Root module
+│   │   │   ├── app.update.ts             # Top-level command handlers (/start, /menu, /ask, lf_ callbacks)
+│   │   │   ├── main.ts                   # Bootstrap: webhook mount, BigInt patch, retry logic
 │   │   │   ├── modules/
-│   │   │   │   ├── search/         # Groq intent classifier + fallback keyword search
-│   │   │   │   └── admin/          # REST API for dashboard (guarded by API key)
-│   │   │   ├── scenes/             # Telegraf FSM scenes (one per feature)
-│   │   │   │   ├── onboarding.scene.ts
-│   │   │   │   ├── profile.scene.ts
-│   │   │   │   ├── vehicles.scene.ts
-│   │   │   │   ├── workers.scene.ts
-│   │   │   │   ├── microservices.scene.ts
-│   │   │   │   ├── carpool.scene.ts
-│   │   │   │   ├── search.scene.ts
-│   │   │   │   └── settings.scene.ts
+│   │   │   │   ├── admin/                # REST API (guarded by x-admin-api-key)
+│   │   │   │   │   ├── admin.controller.ts   # All /admin/* endpoints
+│   │   │   │   │   ├── admin.service.ts      # DB queries for admin operations
+│   │   │   │   │   └── admin-api-key.guard.ts
+│   │   │   │   ├── carpool/
+│   │   │   │   │   ├── carpool.service.ts    # Accept/decline requests, seat management
+│   │   │   │   │   ├── carpool.scheduler.ts  # Cron: expire stale requests, restore seats
+│   │   │   │   │   ├── ors.service.ts        # OpenRouteService polyline + distance
+│   │   │   │   │   ├── photon.service.ts     # Geocoding with society coordinate bias
+│   │   │   │   │   └── polyline.service.ts   # Polyline encode/decode
+│   │   │   │   ├── lost-found/
+│   │   │   │   │   ├── lost-found.ai.ts      # Groq Vision (found) + text enrichment (lost)
+│   │   │   │   │   ├── lost-found.search.ts  # Groq semantic match + keyword fallback
+│   │   │   │   │   └── lost-found.service.ts # Save items, scan matches, send Telegram notifications
+│   │   │   │   ├── search/
+│   │   │   │   │   ├── search.service.ts     # /ask intent classification + DB queries
+│   │   │   │   │   └── search-intent.ts      # Intent type definitions
+│   │   │   │   └── workers/
+│   │   │   │       ├── rating.service.ts     # Worker rating CRUD + avg calculation
+│   │   │   │       └── worker-tags.ts        # Tag derivation from category + notes
+│   │   │   ├── scenes/                   # Telegraf FSM scenes (one per feature)
+│   │   │   │   ├── onboarding.scene.ts   # Registration flow (name, flat, phone)
+│   │   │   │   ├── profile.scene.ts      # View/edit own profile
+│   │   │   │   ├── vehicle.scene.ts      # Add/edit/delete vehicles
+│   │   │   │   ├── worker.scene.ts       # Add/browse/edit worker recommendations
+│   │   │   │   ├── microservice.scene.ts # Add/browse/edit micro-services
+│   │   │   │   ├── search.scene.ts       # /ask result display
+│   │   │   │   ├── settings.scene.ts     # User preferences
+│   │   │   │   ├── carpool/
+│   │   │   │   │   ├── carpool-home.scene.ts    # Carpool menu
+│   │   │   │   │   ├── carpool-post.scene.ts    # Post new carpool route
+│   │   │   │   │   ├── carpool-search.scene.ts  # Search for carpool seats
+│   │   │   │   │   ├── carpool-manage.scene.ts  # Manage own routes (pause, delete)
+│   │   │   │   │   └── carpool-ride.scene.ts    # Active ride session
+│   │   │   │   └── lost-found/
+│   │   │   │       ├── found-report.scene.ts    # Report a found item (photo + description)
+│   │   │   │       ├── lost-report.scene.ts     # Report a lost item (description + auto-match)
+│   │   │   │       └── lost-found-manage.scene.ts # View and resolve own reports
 │   │   │   ├── guards/
-│   │   │   │   ├── group-member.guard.ts   # Telegram group membership check
-│   │   │   │   └── admin-api-key.guard.ts  # x-admin-api-key header check
-│   │   │   ├── keyboards/
-│   │   │   ├── prisma/
-│   │   │   └── sessions/
+│   │   │   │   └── group-member.guard.ts # Verifies Telegram group membership
+│   │   │   ├── sessions/
+│   │   │   │   ├── prisma-session.middleware.ts  # DB-backed Telegraf session store
+│   │   │   │   ├── idle-timeout.middleware.ts    # Auto-leave idle scenes
+│   │   │   │   └── private-chat-only.middleware.ts
+│   │   │   ├── utils/
+│   │   │   │   ├── validation.ts         # isValidName, isValidFlatNumber, isValidPhone, etc.
+│   │   │   │   └── callback-data.ts      # Telegram callback_data helpers
+│   │   │   └── types/
+│   │   │       └── bot-context.ts        # Extended BotContext with session typing
 │   │   └── prisma/
-│   │       ├── schema.prisma
+│   │       ├── schema.prisma             # Source of truth for DB shape
 │   │       └── migrations/
-│   └── dashboard/                  # Next.js admin dashboard
+│   └── dashboard/                        # Next.js 16 admin dashboard
+│       ├── proxy.ts                      # Middleware: validates HMAC session cookie
+│       ├── lib/
+│       │   ├── session-crypto.ts         # createSessionToken / verifySessionToken (Web Crypto)
+│       │   └── sessions.ts               # Deprecated (kept for import safety)
 │       └── app/
-│           ├── lib/admin-api.ts    # Server-side fetch wrapper (uses ADMIN_API_URL + ADMIN_API_KEY)
-│           ├── actions/admin.ts    # Next.js server actions for CRUD
-│           ├── residents/
-│           ├── workers/
-│           ├── services/
-│           ├── carpool/
-│           ├── broadcast/
-│           ├── analytics/
-│           └── api/
-│               ├── login/          # Sets admin-session cookie
-│               └── broadcast/      # Proxies broadcast to bot backend
-├── render.yaml                     # Render deployment config (build + start commands)
-└── package.json                    # Root pnpm workspace scripts
+│           ├── layout.tsx                # Root layout with nav + Sonner toasts
+│           ├── page.tsx                  # Dashboard home (stats cards)
+│           ├── lib/
+│           │   ├── admin-api.ts          # adminFetch helper (ADMIN_API_URL + ADMIN_API_KEY)
+│           │   └── api-client.ts         # apiFetch (boolean) + apiFetchJson<T> (body)
+│           ├── actions/
+│           │   └── admin.ts              # All server actions (CRUD + reprocess)
+│           ├── api/
+│           │   ├── login/route.ts        # POST: verify password, set HMAC-signed cookie
+│           │   └── broadcast/route.ts    # POST: proxy multipart broadcast to bot API
+│           ├── residents/                # Manage residents (ban, edit, delete)
+│           ├── workers/                  # Manage worker recommendations
+│           ├── services/                 # Manage micro-services
+│           ├── carpool/                  # View carpool routes
+│           ├── faq/                      # CRUD for FAQ entries used by /ask AI
+│           ├── broadcast/                # Send messages/photos to all active residents
+│           ├── lost-found/               # View lost/found items + Reprocess Matches button
+│           ├── analytics/                # Usage stats charts
+│           └── login/                    # Login page
+├── render.yaml                           # Render deployment config
+└── package.json                          # pnpm workspace scripts
 ```
 
 ---
 
-## Bot Commands
+## Database Models (Prisma)
 
-| Command | Description |
+| Model | Purpose |
 |---|---|
-| `/start` | Onboard new residents or show main menu if already registered |
-| `/menu` | Show main menu |
-| `/ask <query>` | AI-powered natural language search across workers, services, and carpools |
+| `Resident` | Core user record: name, flatNumber, phone, telegramId, isActive, onboardingComplete |
+| `BotSession` | Telegraf session store (persisted to DB) |
+| `Vehicle` | Resident-owned vehicles (plate numbers) |
+| `WorkerRecommendation` | Worker entries with category, tags, notes, avgRating |
+| `WorkerRating` | Individual ratings per worker per resident |
+| `MicroService` | Resident-run services with category and description |
+| `Category` | Admin-managed category list shared by workers and services |
+| `CarpoolRoute` | Route with polyline, seats (morning + return), schedule |
+| `CarpoolRequest` | Seat request from a rider (PENDING/ACCEPTED/DECLINED/EXPIRED) |
+| `RideSession` / `RideSessionMember` | Active ride tracking |
+| `Faq` | Society FAQ entries used as LLM context for `/ask` |
+| `Broadcast` | Log of sent broadcasts |
+| `FoundItem` | Found items with photo, user description, AI description |
+| `LostItem` | Lost item reports with user description, AI-enriched description |
+| `LostFoundMatch` | Cross-references between found and lost items (triggers notification) |
+
+---
+
+## Bot Commands & Navigation
+
+| Entry point | How to access |
+|---|---|
+| `/start` | Onboard new residents or show menu if already registered |
+| `/menu` | Show main menu inline keyboard |
+| `/ask <query>` | AI-powered search (workers, services, carpool, FAQs) |
+| `/exit` | Leave current scene, return to main menu |
+
+### Main Menu Sections
+
+- 🏠 **My Profile** — view/edit name, flat, phone
+- 🚗 **My Vehicles** — add/edit/delete registered vehicles
+- 👷 **Workers** — browse or recommend a worker; rate via code
+- 🏪 **Services** — browse or list a micro-service
+- 🚌 **Carpool** — post a route, search for seats, manage rides
+- 📦 **Lost & Found** — report found/lost items; view own reports
+- ⚙️ **Settings** — preferences
 
 ### `/ask` Examples
 
@@ -100,13 +182,16 @@ society-bot/
 /ask someone who does tiffin service
 ```
 
-The AI (Groq) extracts structured intent from the query, then filters the database directly:
-- **Workers**: matches `category`, `notes`, `tags`, `name`
-- **Services**: matches `name`, `description`, `category`
-- **Carpool**: matches `destination` (ILIKE), `days` (array contains)
-- **FAQ**: Answers directly using `Faq` database entries as LLM context
+The AI (Groq `llama-3.1-8b-instant`) classifies intent into `worker | service | carpool | faq | unknown`, extracts structured fields, then queries the DB. Falls back to keyword matching if Groq is unavailable or fails.
 
-Falls back to keyword regex matching if Groq is unavailable.
+---
+
+## Lost & Found Flow
+
+1. **Found item**: Resident uploads photo → Groq Vision generates detailed AI description → saved to DB → system scans all open lost reports for matches → matching residents notified via Telegram with photo + Yes/No buttons
+2. **Lost item**: Resident describes lost item → Groq enriches description with synonyms → saved → system scans all open found items for matches → resident notified immediately if a match exists
+3. **Matching engine**: Groq semantic scoring (primary) + keyword overlap scoring (fallback). Already-matched pairs are never re-notified.
+4. **Admin reprocess**: Dashboard **🔄 Reprocess Matches** button re-runs matching across all open items without re-generating AI descriptions.
 
 ---
 
@@ -115,9 +200,12 @@ Falls back to keyword regex matching if Groq is unavailable.
 ### Prerequisites
 
 - Node.js 20+
-- pnpm
+- pnpm 9
 - A Telegram bot token from [@BotFather](https://t.me/botfather)
-- PostgreSQL (local or [Neon](https://neon.tech) free tier)
+- A Telegram group (the bot must be an admin in it)
+- PostgreSQL (local Docker or [Neon](https://neon.tech) free tier)
+- Groq API key from [console.groq.com](https://console.groq.com) (free tier)
+- OpenRouteService API key from [openrouteservice.org](https://openrouteservice.org) (free tier, for carpool)
 
 ### Setup
 
@@ -136,16 +224,27 @@ cp apps/dashboard/.env.example apps/dashboard/.env.local
 # Fill in values
 
 # Run database migrations
-cd apps/bot && npx prisma migrate dev && cd ../..
+pnpm prisma:migrate
 
-# Start bot in development (polling mode — leave WEBHOOK_DOMAIN empty)
+# Start bot in development (polling mode — WEBHOOK_DOMAIN must be empty)
 pnpm dev:bot
 
-# Start dashboard in development
+# Start dashboard in development (separate terminal)
 pnpm dev:dashboard
 ```
 
-> **Local vs Production mode**: When `WEBHOOK_DOMAIN` is empty, the bot runs in polling mode (good for local dev). When `WEBHOOK_DOMAIN` is set, it runs in webhook mode (required on Render).
+> **Local vs Production**: When `WEBHOOK_DOMAIN` is empty the bot runs in polling mode. When set, it runs in webhook mode (required on Render).
+
+### Useful Dev Commands
+
+```bash
+pnpm db:up          # Start local Postgres via Docker Compose
+pnpm db:studio      # Open Prisma Studio (GUI for the DB)
+pnpm db:migrate     # Create and apply a new migration
+pnpm test           # Run unit tests
+pnpm lint           # Run ESLint + Prettier
+pnpm build:bot      # TypeScript compile check (run before committing)
+```
 
 ---
 
@@ -154,28 +253,28 @@ pnpm dev:dashboard
 ### `apps/bot/.env`
 
 ```env
-DATABASE_URL=""                  # Neon PostgreSQL pooled connection string (e.g. includes -pooler and ?pgbouncer=true)
-DIRECT_URL=""                    # Neon PostgreSQL direct connection string (required for Prisma migrations)
-TELEGRAM_BOT_TOKEN=""            # From @BotFather
-TELEGRAM_GROUP_ID=""             # Numeric group ID (negative number, e.g. -1001234567890)
-TELEGRAM_GROUP_INVITE_LINK=""    # https://t.me/+xxxxxxx
-WEBHOOK_DOMAIN=""                # Production Render URL (leave empty for local polling)
-ADMIN_TELEGRAM_IDS=""            # Comma-separated Telegram user IDs for admin access
-ADMIN_API_KEY=""                 # Random secret: openssl rand -hex 32
-ADMIN_PASSWORD=""                # Dashboard login password
-GROQ_API_KEY=""                  # From console.groq.com (free tier available)
-ORS_API_KEY=""                   # From openrouteservice.org (free tier available)
-SOCIETY_LAT=""                   # Society latitude for carpool routing
-SOCIETY_LNG=""                   # Society longitude for carpool routing
-SOCIETY_ADDRESS=""               # Formatted society address
+DATABASE_URL=""             # Neon pooled connection (include ?pgbouncer=true)
+DIRECT_URL=""               # Neon direct connection (required for migrations)
+TELEGRAM_BOT_TOKEN=""       # From @BotFather
+TELEGRAM_GROUP_ID=""        # Numeric group ID (negative, e.g. -1001234567890)
+TELEGRAM_GROUP_INVITE_LINK="" # https://t.me/+xxxxxxx
+WEBHOOK_DOMAIN=""           # Render URL in production; empty = polling mode locally
+ADMIN_TELEGRAM_IDS=""       # Comma-separated Telegram user IDs for bot admin commands
+ADMIN_API_KEY=""            # Shared secret for dashboard→bot API: openssl rand -hex 32
+ADMIN_PASSWORD=""           # Dashboard login password
+GROQ_API_KEY=""             # From console.groq.com
+ORS_API_KEY=""              # From openrouteservice.org (carpool routing)
+SOCIETY_LAT=""              # Society latitude (for Photon geocoding bias)
+SOCIETY_LNG=""              # Society longitude
+SOCIETY_ADDRESS=""          # Formatted address shown in carpool flows
 ```
 
 ### `apps/dashboard/.env.local`
 
 ```env
-ADMIN_API_URL=""     # Bot backend URL (http://localhost:3001 locally, Render URL in production)
-ADMIN_API_KEY=""     # Must match ADMIN_API_KEY in apps/bot/.env
-ADMIN_PASSWORD=""    # Dashboard login password (must match bot ADMIN_PASSWORD)
+ADMIN_API_URL=""    # Bot backend URL (http://localhost:3001 locally, Render URL in prod)
+ADMIN_API_KEY=""    # Must match ADMIN_API_KEY in apps/bot/.env
+ADMIN_PASSWORD=""   # Dashboard login password (must match bot ADMIN_PASSWORD)
 ```
 
 ---
@@ -184,12 +283,12 @@ ADMIN_PASSWORD=""    # Dashboard login password (must match bot ADMIN_PASSWORD)
 
 ### Backend → Render
 
-The repo includes `render.yaml` which configures the build automatically. When connecting to Render:
+`render.yaml` in the repo root configures everything automatically.
 
-1. Create a new **Web Service** on [render.com](https://render.com)
-2. Connect this GitHub repo — Render will detect `render.yaml`
-3. Add all environment variables from `apps/bot/.env` in the Render dashboard (Environment tab)
-   > **Note on Neon Postgres**: Ensure `DATABASE_URL` is the pooled connection string (with `?pgbouncer=true`) and `DIRECT_URL` is the unpooled direct connection string. Render runs `prisma migrate deploy` which requires the `DIRECT_URL`.
+1. Create a **Web Service** on [render.com](https://render.com)
+2. Connect this GitHub repo — Render detects `render.yaml`
+3. Add all environment variables from `apps/bot/.env` in the Render **Environment** tab
+   > **Neon tip**: `DATABASE_URL` = pooled connection string (with `-pooler` and `?pgbouncer=true`). `DIRECT_URL` = direct/unpooled string. Render runs `prisma migrate deploy` at startup which requires `DIRECT_URL`.
 4. After first deploy, set `WEBHOOK_DOMAIN` to your Render URL (e.g. `https://society-bot-xxxx.onrender.com`) and redeploy
 
 **Build command** (from `render.yaml`):
@@ -201,54 +300,63 @@ pnpm install --frozen-lockfile && pnpm build:bot
 ```
 pnpm start:bot
 ```
-This runs `prisma migrate deploy && node dist/main.js`.
+Runs: `prisma migrate deploy && node dist/main.js`
 
 ### Frontend → Vercel
 
 1. Import the repo on [vercel.com](https://vercel.com)
 2. Set **Root Directory** to `apps/dashboard`
 3. Add environment variables in Vercel → Settings → Environment Variables:
-   - `ADMIN_API_URL` = your Render backend URL (no trailing slash)
-   - `ADMIN_API_KEY` = same value as the bot's `ADMIN_API_KEY` on Render
+   - `ADMIN_API_URL` = your Render URL (no trailing slash)
+   - `ADMIN_API_KEY` = same as bot `ADMIN_API_KEY`
    - `ADMIN_PASSWORD` = dashboard login password
 4. Deploy
 
-> ⚠️ **Vercel does not auto-redeploy when env vars change.** Always manually trigger a redeploy after updating environment variables: Deployments → ⋯ → Redeploy.
+> ⚠️ **Changing env vars on Vercel does NOT auto-redeploy.** Go to Deployments → ⋯ → Redeploy after any env var change. Changing `ADMIN_PASSWORD` also invalidates all existing dashboard sessions automatically (sessions are HMAC-signed with the password).
 
 ### Keep-Alive (Render Free Tier)
 
-Render's free tier sleeps after 15 minutes of inactivity. A sleeping bot misses Telegram webhooks.
+Render free tier sleeps after 15 min of inactivity. A sleeping bot misses webhooks.
 
 Set up a free monitor on [UptimeRobot](https://uptimerobot.com):
-- Monitor type: HTTP(S)
-- URL: `https://your-render-url.onrender.com/health`
-- Interval: every 5 minutes
+- **Type**: HTTP(S)
+- **URL**: `https://your-render-url.onrender.com/health`
+- **Interval**: every 5 minutes
 
 ---
 
 ## Admin Dashboard
 
-Accessible at your Vercel URL. Protected by a password set via `ADMIN_PASSWORD`.
+Accessible at your Vercel URL. Protected by `ADMIN_PASSWORD` (HMAC-signed session cookies — no session DB required).
 
 | Page | Description |
 |---|---|
-| Vehicle Lookup | Search any registered vehicle by plate number |
-| Residents | View, edit, disable/enable, delete residents |
-| Workers | View, add, edit, ban/unban worker entries |
-| Services | View, add, edit, disable micro-services |
-| Carpool | View and manage carpool routes |
-| FAQs | View, add, edit, delete society FAQs for the AI bot |
-| Broadcast | Send a message to all active residents via the bot |
-| Analytics | Overview stats (residents, services, carpools, workers) |
+| **Home** | Key stats: total residents, workers, services, carpools |
+| **Residents** | View, search, edit, ban/unban, delete residents |
+| **Workers** | View, add, edit worker recommendations; see avg ratings |
+| **Services** | View, add, edit, disable micro-services |
+| **Carpool** | View all carpool routes and their status |
+| **FAQ** | Create, edit, delete FAQ entries (used as LLM context by `/ask`) |
+| **Lost & Found** | View found and lost item reports; resolve, delete; **🔄 Reprocess Matches** |
+| **Broadcast** | Send a text or photo message to all active residents |
+| **Analytics** | Charts: worker categories, service distribution, resident growth, carpool stats |
 
 ---
 
-## Access Control & Security
+## Security Model
 
-Access is strictly controlled by Telegram group membership and onboarding completion. There is no manual approval process.
-
-- **Group Membership Check**: Guarded by `GroupMemberGuard`. If a resident leaves or is removed from the Telegram group, bot access is immediately revoked.
-- **Strict Onboarding Validation**: All scenes and commands enforce that a user has successfully completed the onboarding flow (name and flat number registered). Unregistered users are forcefully redirected to the onboarding scene.
+| Concern | Implementation |
+|---|---|
+| Bot access | Telegram group membership (`GroupMemberGuard`) + completed onboarding |
+| Admin API | `x-admin-api-key` header checked with `timingSafeEqual` (`AdminApiKeyGuard`) |
+| Dashboard auth | `ADMIN_PASSWORD` compared with `timingSafeEqual`; session cookie is HMAC-SHA256 signed |
+| Ownership checks | Every edit/delete verifies `record.residentId === resident.id` before mutating |
+| Dynamic field keys | Whitelisted via `isEditableField()` before use in Prisma updates |
+| Vehicle lookup (inform) | Exact plate match only — no `contains` to prevent owner enumeration |
+| File uploads | `FileInterceptor` enforces 5 MB max on all endpoints |
+| Banned accounts | `isActive` never set in upsert `update` block — admin bans survive re-onboarding |
+| AI prompt injection | FAQ content wrapped in `<faq_data>...</faq_data>` XML delimiters |
+| Secrets | All comparisons use `crypto.timingSafeEqual`; `.env` files never committed |
 
 ---
 

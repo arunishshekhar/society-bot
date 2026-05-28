@@ -24,4 +24,23 @@ export async function apiFetch(
   }
 }
 
+/** Like apiFetch but returns the parsed JSON response body (throws on error). */
+export async function apiFetchJson<T = unknown>(
+  path: string,
+  method: string,
+  body?: unknown,
+): Promise<T> {
+  const res = await fetch(`${api}${path}`, {
+    method,
+    headers: { 'content-type': 'application/json', 'x-admin-api-key': key },
+    body: body ? JSON.stringify(body) : undefined,
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export { api, key };

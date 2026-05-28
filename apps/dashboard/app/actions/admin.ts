@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { apiFetch, api, key } from '../lib/api-client';
+import { apiFetch, apiFetchJson, api, key } from '../lib/api-client';
 
 // ── Residents ─────────────────────────────────────────────
 export async function updateResidentAction(formData: FormData) {
@@ -222,7 +222,10 @@ export async function reprocessLostFoundAction(): Promise<{
   foundProcessed: number;
   lostProcessed: number;
 }> {
-  const res = await apiFetch('/admin/lost-found/reprocess', 'POST');
+  const res = await apiFetchJson<{ message: string; foundProcessed: number; lostProcessed: number }>(
+    '/admin/lost-found/reprocess',
+    'POST',
+  );
   revalidatePath('/lost-found');
-  return res as any;
+  return res;
 }
