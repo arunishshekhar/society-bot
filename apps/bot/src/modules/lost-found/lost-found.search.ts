@@ -36,7 +36,10 @@ export class LostFoundSearchService {
   ): Promise<LostItemMatch[]> {
     // Load all open lost items that haven't already been matched to this found item
     const candidates = await this.prisma.$queryRaw<LostItemMatch[]>`
-      SELECT l.*, r."telegramId", r.name, r."flatNumber"
+      SELECT
+        l.id, l."reportedById", l."originalDescription", l."aiDescription",
+        l.status, l."resolvedAt", l."resolvedById", l."createdAt", l."updatedAt",
+        r."telegramId", r.name, r."flatNumber"
       FROM "LostItem" l
       JOIN "Resident" r ON l."reportedById" = r.id
       WHERE l.status = 'OPEN'
@@ -61,7 +64,11 @@ export class LostFoundSearchService {
     lostAiDescription: string,
   ): Promise<FoundItemMatch[]> {
     const candidates = await this.prisma.$queryRaw<FoundItemMatch[]>`
-      SELECT f.*, r.name, r."flatNumber", r."telegramId"
+      SELECT
+        f.id, f."reportedById", f."originalDescription", f."aiDescription",
+        f."imageFileId", f."collectionLocation", f.status,
+        f."resolvedAt", f."resolvedById", f."createdAt", f."updatedAt",
+        r.name, r."flatNumber", r."telegramId"
       FROM "FoundItem" f
       JOIN "Resident" r ON f."reportedById" = r.id
       WHERE f.status = 'OPEN'
