@@ -44,16 +44,15 @@ export interface BotSession extends Scenes.SceneSession<BotSceneSessionData> {
   };
   workers?: {
     mode?: "adding" | "editing";
-    step?: "name" | "phone" | "category" | "rating" | "notes" | "field";
+    step?: "name" | "phone" | "category" | "notes" | "field";
     selectedId?: string;
-    editField?: "name" | "phone" | "category" | "rating" | "notes";
+    editField?: "name" | "phone" | "category" | "notes";
     browseCategory?: string;
     page?: number;
     draft?: {
       name?: string;
       phone?: string;
       category?: string;
-      rating?: number | null;
       notes?: string | null;
     };
   };

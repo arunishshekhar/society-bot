@@ -85,7 +85,6 @@ export class AdminController {
       name: string;
       phone: string;
       category: string;
-      rating?: number | null;
       notes?: string | null;
     },
   ) {
@@ -101,7 +100,6 @@ export class AdminController {
       name?: string;
       phone?: string;
       category?: string;
-      rating?: number | null;
       notes?: string | null;
       isActive?: boolean;
     },

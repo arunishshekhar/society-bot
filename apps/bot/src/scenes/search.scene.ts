@@ -54,12 +54,13 @@ export class SearchScene {
     if (intent.type === "service")
       return this.searchServices(ctx, intent.category, intent.keywords);
 
-    // For carpool and inform, we can just defer back to the global handler
+    // For carpool, inform, and rate_worker, defer to the global handler
     if (
       intent.type === "post_carpool" ||
       intent.type === "find_carpool" ||
       intent.type === "find_return" ||
-      intent.type === "inform"
+      intent.type === "inform" ||
+      intent.type === "rate_worker"
     ) {
       await ctx.scene.leave();
       return this.searchService.handleAsk(ctx, query);
@@ -95,13 +96,15 @@ export class SearchScene {
         ],
       },
       include: { resident: true },
-      orderBy: [{ rating: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ avgRating: "desc" }, { createdAt: "desc" }],
       take: 5,
     });
     if (!workers.length) return this.empty(ctx);
     for (const worker of workers) {
+      const ratingDisplay = worker.avgRating ? `⭐ ${worker.avgRating}` : "Not rated yet";
       await ctx.reply(
-        `${worker.name} - ${worker.category}\nAdded by: ${worker.resident?.flatNumber ?? "Admin"}\n${worker.notes ?? ""}`,
+        `👷 *${worker.name}* [${worker.workerCode}] — ${worker.category}\n${ratingDisplay}\nAdded by: ${worker.resident?.flatNumber ?? "Admin"}${worker.notes ? `\n📝 ${worker.notes}` : ""}`,
+        { parse_mode: "Markdown" },
       );
     }
   }

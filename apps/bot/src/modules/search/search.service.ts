@@ -3,6 +3,7 @@ import { Markup } from "telegraf";
 import Groq from "groq-sdk";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { RatingService } from "../workers/rating.service";
 import { normalizeSearchIntent, SearchIntent } from "./search-intent";
 import { BotContext } from "../../types/bot-context";
 
@@ -13,7 +14,10 @@ export class SearchService {
       ? new Groq({ apiKey: process.env.GROQ_API_KEY })
       : null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ratingService: RatingService,
+  ) {}
 
   // ─── Public entry point for /ask command ────────────────────────────────────
 
@@ -75,6 +79,8 @@ export class SearchService {
       // We will emulate text to jump steps if needed, but scene enter will just prompt for the missing parts.
     } else if (intent.type === "inform") {
       await this.replyInform(ctx, intent);
+    } else if (intent.type === "rate_worker") {
+      await this.replyRateWorker(ctx, intent.worker_code, intent.stars);
     } else {
       await ctx.reply(
         "🤔 I couldn't understand what you're looking for. Try being more specific.\n\nExamples:\n• /ask North Indian maid\n• /ask carpool MG Road Monday 8AM\n• /ask electrician",
@@ -110,6 +116,7 @@ Classify each query into exactly one intent type:
 - "find_carpool": looking for a ride or carpool.
 - "find_return": looking for a return ride.
 - "inform": ONLY for sending a direct message/notification to a specific flat owner or vehicle owner (e.g., "tell flat 203 to move their car").
+- "rate_worker": rating a worker by their 3-char code (e.g., "rate AB3 4 star", "give 5 stars to X7K").
 - "unknown": if the query doesn't fit any of the above.
 
 Extract the following JSON fields based on the chosen type:
@@ -124,6 +131,8 @@ Extract the following JSON fields based on the chosen type:
 - target_type: for inform queries ONLY, "vehicle" or "flat"
 - target_id: for inform queries ONLY, the flat or vehicle number (e.g. "KA12AS2322", "03-12-03")
 - message: for inform queries ONLY, the message to relay
+- worker_code: for rate_worker queries ONLY, the 3-char worker code (e.g. "AB3", "X7K")
+- stars: for rate_worker queries ONLY, integer 1-5
 
 Respond ONLY with valid JSON.`,
           },
@@ -145,6 +154,59 @@ Respond ONLY with valid JSON.`,
   }
 
   // ─── DB Query Helpers ────────────────────────────────────────────────────────
+
+  // ─── Rate Worker Reply ──────────────────────────────────────────────────────
+
+  async replyRateWorker(
+    ctx: BotContext,
+    workerCode?: string,
+    stars?: number,
+  ): Promise<void> {
+    if (!workerCode || !stars) {
+      await ctx.reply(
+        "Please specify the worker code and star count.\n\nExample: `/ask rate AB3 4 star`",
+        { parse_mode: "Markdown" },
+      );
+      return;
+    }
+
+    const worker = await this.ratingService.lookupByCode(workerCode);
+    if (!worker || !worker.isActive || worker.isBanned) {
+      await ctx.reply(
+        `😕 No active worker found with code *${workerCode}*.\nCheck the code and try again.`,
+        { parse_mode: "Markdown" },
+      );
+      return;
+    }
+
+    const resident = await this.prisma.resident.findUnique({
+      where: { telegramId: BigInt(ctx.from?.id ?? 0) },
+    });
+    if (!resident) {
+      await ctx.scene.enter("onboarding");
+      return;
+    }
+
+    try {
+      const { isUpdate, newAvg, count } = await this.ratingService.rateWorker(
+        worker.id,
+        resident.id,
+        stars,
+      );
+      const verb = isUpdate ? "updated to" : "recorded:";
+      await ctx.reply(
+        `✅ Rating ${verb} ${"⭐".repeat(stars)} for *${worker.name}* [${worker.workerCode}]\n` +
+          `New average: ⭐ ${newAvg} (${count} ${count === 1 ? "rating" : "ratings"})`,
+        { parse_mode: "Markdown" },
+      );
+    } catch (err: any) {
+      if (err?.message === "SELF_RATE") {
+        await ctx.reply("❌ You cannot rate a worker you added yourself.");
+      } else {
+        await ctx.reply("❌ Could not save rating. Please try again.");
+      }
+    }
+  }
 
   async replyWorkers(
     ctx: BotContext,
@@ -173,7 +235,7 @@ Respond ONLY with valid JSON.`,
         ...(orClauses.length ? { OR: orClauses } : {}),
       },
       include: { resident: true },
-      orderBy: [{ rating: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ avgRating: "desc" }, { createdAt: "desc" }],
       take: 5,
     });
 
@@ -186,12 +248,13 @@ Respond ONLY with valid JSON.`,
 
     await ctx.reply(`Found ${workers.length} worker(s):`);
     for (const w of workers) {
-      const stars = w.rating ? "⭐".repeat(Math.min(w.rating, 5)) : "";
+      const ratingCount = await this.prisma.workerRating.count({ where: { workerId: w.id } });
+      const ratingStr = this.ratingService.formatRating(w.avgRating, ratingCount);
       const addedBy = w.resident?.flatNumber
         ? `Flat ${w.resident.flatNumber}`
         : "Admin";
       await ctx.reply(
-        `👷 *${w.name}* — ${w.category}${stars ? ` ${stars}` : ""}\n📞 ${w.phone}${w.notes ? `\n📝 ${w.notes}` : ""}\nAdded by: ${addedBy}`,
+        `👷 *${w.name}* [${w.workerCode}] — ${w.category}\n${ratingStr}\n📞 ${w.phone}${w.notes ? `\n📝 ${w.notes}` : ""}\nAdded by: ${addedBy}`,
         { parse_mode: "Markdown" },
       );
     }
@@ -358,6 +421,17 @@ ${faqContext}`,
       .split(/[^a-z0-9]+/)
       .filter(Boolean)
       .slice(0, 8);
+
+    // Rate worker: "rate AB3 4 star" / "rate X7K 5 stars"
+    const rateMatch = query.match(/rate\s+([A-Za-z0-9]{3,4})\s+(\d)\s*stars?/i);
+    if (rateMatch) {
+      return {
+        type: "rate_worker",
+        keywords: [],
+        worker_code: rateMatch[1].toUpperCase(),
+        stars: Math.min(5, Math.max(1, Number(rateMatch[2]))),
+      };
+    }
 
     if (/(inform|tell|message|notify)/.test(lower)) {
       const match = query.match(

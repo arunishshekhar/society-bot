@@ -11,6 +11,7 @@ import { scenes } from "./scenes";
 import { SearchModule } from "./modules/search/search.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { CarpoolModule } from "./modules/carpool/carpool.module";
+import { WorkersModule } from "./modules/workers/workers.module";
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CarpoolModule } from "./modules/carpool/carpool.module";
     SearchModule,
     AdminModule,
     CarpoolModule,
+    WorkersModule,
     TelegrafModule.forRootAsync({
       imports: [PrismaModule],
       inject: [PrismaService],

@@ -21,6 +21,7 @@ model Resident {
   updatedAt            DateTime               @updatedAt
   vehicles             Vehicle[]
   workerRecs           WorkerRecommendation[]
+  workerRatings        WorkerRating[]
   microService         MicroService?
   carpoolRoutes        CarpoolRoute[]
   carpoolRequests      CarpoolRequest[]
@@ -40,18 +41,20 @@ model Vehicle {
 
 model WorkerRecommendation {
   id          String    @id @default(uuid())
+  workerCode  String    @unique
   residentId  String?
   name        String
   phone       String
   category    String
   tags        String[]
-  rating      Int?
+  avgRating   Float?
   notes       String?
   isActive    Boolean   @default(true)
   isBanned    Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   resident    Resident? @relation(fields: [residentId], references: [id], onDelete: SetNull)
+  ratings     WorkerRating[]
 }
 
 model MicroService {
@@ -164,6 +167,20 @@ enum RideStatus {
   ACTIVE
   COMPLETED
   EXPIRED
+}
+
+model WorkerRating {
+  id         String   @id @default(uuid())
+  workerId   String
+  residentId String
+  stars      Int      // 1-5
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  worker   WorkerRecommendation @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  resident Resident             @relation(fields: [residentId], references: [id], onDelete: Cascade)
+
+  @@unique([workerId, residentId])
 }
 
 model Category {

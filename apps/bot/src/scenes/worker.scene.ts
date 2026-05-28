@@ -4,6 +4,7 @@ import { Markup } from "telegraf";
 import { GroupMemberGuard } from "../guards/group-member.guard";
 import { mainMenuKeyboard } from "../keyboards/main-menu.keyboard";
 import { deriveWorkerTags } from "../modules/workers/worker-tags";
+import { RatingService } from "../modules/workers/rating.service";
 import { SearchService } from "../modules/search/search.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { BotContext } from "../types/bot-context";
@@ -28,6 +29,7 @@ export class WorkerScene {
   constructor(
     private readonly prisma: PrismaService,
     private readonly searchService: SearchService,
+    private readonly ratingService: RatingService,
   ) {}
 
   @SceneEnter()
@@ -98,7 +100,7 @@ export class WorkerScene {
 
     await ctx.reply(
       [
-        `${worker.name}`,
+        `${worker.name} [${worker.workerCode}]`,
         `Phone: ${worker.phone}`,
         `Added by: ${worker.resident?.flatNumber ?? "Admin"}`,
       ].join("\n"),
@@ -113,6 +115,88 @@ export class WorkerScene {
     );
   }
 
+  // ─── Rate flow ───────────────────────────────────────────────────────────────
+
+  @Action(/workers:rate:.+/)
+  async rate(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    const id = getCallbackData(ctx)?.split(":").at(-1);
+    if (!id) return;
+
+    const worker = await this.prisma.workerRecommendation.findUnique({
+      where: { id },
+      select: { id: true, name: true, workerCode: true, avgRating: true },
+    });
+    if (!worker) return;
+
+    const ratingCount = await this.prisma.workerRating.count({
+      where: { workerId: id },
+    });
+
+    await ctx.reply(
+      `Rate *${worker.name}* [${worker.workerCode}]\nCurrent: ${this.ratingService.formatRating(worker.avgRating, ratingCount)}\n\nChoose your rating:`,
+      {
+        parse_mode: "Markdown",
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback("⭐ 1", `workers:stars:${id}:1`),
+            Markup.button.callback("⭐⭐ 2", `workers:stars:${id}:2`),
+            Markup.button.callback("⭐⭐⭐ 3", `workers:stars:${id}:3`),
+          ],
+          [
+            Markup.button.callback("⭐⭐⭐⭐ 4", `workers:stars:${id}:4`),
+            Markup.button.callback("⭐⭐⭐⭐⭐ 5", `workers:stars:${id}:5`),
+          ],
+          [Markup.button.callback("Cancel", `workers:select:${id}`)],
+        ]),
+      },
+    );
+  }
+
+  @Action(/workers:stars:.+/)
+  async recordStars(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    const parts = getCallbackData(ctx)?.split(":");
+    // format: workers:stars:<id>:<stars>
+    const stars = Number(parts?.at(-1));
+    const id = parts?.slice(2, -1).join(":");
+    if (!id || !stars || stars < 1 || stars > 5) return;
+
+    const resident = await this.getResident(ctx);
+    if (!resident) {
+      await ctx.scene.enter("onboarding");
+      return;
+    }
+
+    try {
+      const { isUpdate, newAvg, count } = await this.ratingService.rateWorker(
+        id,
+        resident.id,
+        stars,
+      );
+
+      const worker = await this.prisma.workerRecommendation.findUnique({
+        where: { id },
+        select: { name: true, workerCode: true },
+      });
+
+      const verb = isUpdate ? "updated to" : "recorded:";
+      await ctx.reply(
+        `✅ Rating ${verb} ${"⭐".repeat(stars)} for *${worker?.name}* [${worker?.workerCode}]\n` +
+          `New average: ⭐ ${newAvg} (${count} ${count === 1 ? "rating" : "ratings"})`,
+        { parse_mode: "Markdown" },
+      );
+    } catch (err: any) {
+      if (err?.message === "SELF_RATE") {
+        await ctx.reply("❌ You cannot rate a worker you added yourself.");
+      } else {
+        await ctx.reply("❌ Could not save rating. Please try again.");
+      }
+    }
+  }
+
+  // ─── Edit flow (owner only) ───────────────────────────────────────────────
+
   @Action(/workers:edit:.+/)
   async edit(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
@@ -126,18 +210,13 @@ export class WorkerScene {
 
     ctx.session.workers = {
       mode: "editing",
-      step: field === "category" || field === "rating" ? field : "field",
+      step: field === "category" ? field : "field",
       selectedId,
       editField: field,
     };
 
     if (field === "category") {
       await this.promptCategories(ctx, "workers:set_category");
-      return;
-    }
-
-    if (field === "rating") {
-      await this.promptRating(ctx, "workers:set_rating");
       return;
     }
 
@@ -169,34 +248,8 @@ export class WorkerScene {
 
     ctx.session.workers = {
       ...state,
-      step: "rating",
-      draft: { ...state.draft, category },
-    };
-    await this.promptRating(ctx, "workers:set_rating");
-  }
-
-  @Action(/workers:set_rating:.+/)
-  async setRating(@Ctx() ctx: BotContext) {
-    await ctx.answerCbQuery();
-    const value = getCallbackData(ctx)?.split(":").at(-1);
-    const rating = value === "skip" ? null : Number(value);
-    const state = ctx.session.workers;
-    if (!state?.mode) return;
-
-    if (state.mode === "editing" && state.selectedId) {
-      await this.prisma.workerRecommendation.update({
-        where: { id: state.selectedId },
-        data: { rating },
-      });
-      await ctx.reply("Recommendation updated.");
-      await this.showRecommendationDetail(ctx, state.selectedId, true);
-      return;
-    }
-
-    ctx.session.workers = {
-      ...state,
       step: "notes",
-      draft: { ...state.draft, rating },
+      draft: { ...state.draft, category },
     };
     await ctx.reply(
       "Add notes, or skip.",
@@ -235,7 +288,6 @@ export class WorkerScene {
     const id = getCallbackData(ctx)?.split(":").at(-1);
     if (!id) return;
 
-    // Ownership check: only the resident who added this recommendation may delete it
     const resident = await this.getResident(ctx);
     if (!resident) return;
 
@@ -345,15 +397,17 @@ export class WorkerScene {
     }
   }
 
+  // ─── Private helpers ─────────────────────────────────────────────────────────
+
   private async showHome(ctx: BotContext) {
     ctx.session.workers = {};
     await ctx.reply(
       "Worker Directory",
       Markup.inlineKeyboard([
-        [Markup.button.callback("Add Worker", "workers:add")],
-        [Markup.button.callback("Browse Workers", "workers:browse")],
-        [Markup.button.callback("My Recommendations", "workers:mine")],
-        [Markup.button.callback("Back", "menu:back")],
+        [Markup.button.callback("➕ Add Worker", "workers:add")],
+        [Markup.button.callback("🔍 Browse Workers", "workers:browse")],
+        [Markup.button.callback("📋 My Recommendations", "workers:mine")],
+        [Markup.button.callback("◀ Back", "menu:back")],
       ]),
     );
   }
@@ -388,7 +442,7 @@ export class WorkerScene {
       this.prisma.workerRecommendation.findMany({
         where,
         include: { resident: true },
-        orderBy: [{ rating: "desc" }, { createdAt: "desc" }],
+        orderBy: [{ avgRating: "desc" }, { createdAt: "desc" }],
         skip: page * take,
         take,
       }),
@@ -432,27 +486,35 @@ export class WorkerScene {
     worker: {
       id: string;
       name: string;
+      workerCode: string;
       phone: string;
       category: string;
-      rating: number | null;
+      avgRating: number | null;
       notes: string | null;
       resident: { flatNumber: string } | null;
     },
   ) {
+    const ratingCount = await this.prisma.workerRating.count({
+      where: { workerId: worker.id },
+    });
     await ctx.reply(
       [
-        `${worker.name} - ${this.title(worker.category)}`,
-        `Rating: ${worker.rating ?? "Not rated"} | Added by: ${worker.resident?.flatNumber ?? "Admin"}`,
-        worker.notes ? `Notes: ${worker.notes}` : undefined,
+        `👷 *${worker.name}* [${worker.workerCode}] — ${this.title(worker.category)}`,
+        `Rating: ${this.ratingService.formatRating(worker.avgRating, ratingCount)} | Added by: Flat ${worker.resident?.flatNumber ?? "Admin"}`,
+        worker.notes ? `📝 ${worker.notes}` : undefined,
       ]
         .filter(Boolean)
         .join("\n"),
-      Markup.inlineKeyboard([
-        [
-          Markup.button.callback("Contact", `workers:contact:${worker.id}`),
-          Markup.button.callback("Report", `workers:report:${worker.id}`),
-        ],
-      ]),
+      {
+        parse_mode: "Markdown",
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback("📞 Contact", `workers:contact:${worker.id}`),
+            Markup.button.callback("⭐ Rate", `workers:rate:${worker.id}`),
+          ],
+          [Markup.button.callback("🚩 Report", `workers:report:${worker.id}`)],
+        ]),
+      },
     );
   }
 
@@ -469,21 +531,25 @@ export class WorkerScene {
     });
 
     const workerLines = workers.map(
-      (w, i) => `${i + 1}. ${w.name} - ${this.title(w.category)}`,
+      (w, i) =>
+        `${i + 1}. *${w.name}* [${w.workerCode}] — ${this.title(w.category)}`,
     );
     const workerButtons = workers.map((w) => [
-      Markup.button.callback(w.name, `workers:select:${w.id}`),
+      Markup.button.callback(`${w.name} [${w.workerCode}]`, `workers:select:${w.id}`),
     ]);
     const text = workers.length
       ? ["My Recommendations", "", ...workerLines].join("\n")
       : "You have not added any worker recommendations yet.";
     await ctx.reply(
       text,
-      Markup.inlineKeyboard([
-        ...workerButtons,
-        [Markup.button.callback("Add Worker", "workers:add")],
-        [Markup.button.callback("Back", "workers:home")],
-      ]),
+      {
+        parse_mode: "Markdown",
+        ...Markup.inlineKeyboard([
+          ...workerButtons,
+          [Markup.button.callback("➕ Add Worker", "workers:add")],
+          [Markup.button.callback("◀ Back", "workers:home")],
+        ]),
+      },
     );
   }
 
@@ -500,6 +566,10 @@ export class WorkerScene {
       return;
     }
 
+    const ratingCount = await this.prisma.workerRating.count({
+      where: { workerId: id },
+    });
+
     const keyboard = editable
       ? Markup.inlineKeyboard([
           [
@@ -508,9 +578,8 @@ export class WorkerScene {
           ],
           [
             Markup.button.callback("Edit Category", "workers:edit:category"),
-            Markup.button.callback("Edit Rating", "workers:edit:rating"),
+            Markup.button.callback("Edit Notes", "workers:edit:notes"),
           ],
-          [Markup.button.callback("Edit Notes", "workers:edit:notes")],
           [Markup.button.callback("Delete", `workers:delete:${worker.id}`)],
           [Markup.button.callback("Back", "workers:mine")],
         ])
@@ -518,12 +587,13 @@ export class WorkerScene {
 
     await ctx.reply(
       [
-        `${worker.name} - ${this.title(worker.category)}`,
-        `Phone: ${worker.phone}`,
-        `Rating: ${worker.rating ?? "Not rated"}`,
-        `Notes: ${worker.notes ?? "None"}`,
+        `👷 *${worker.name}* [${worker.workerCode}]`,
+        `Category: ${this.title(worker.category)}`,
+        `📞 Phone: ${worker.phone}`,
+        `⭐ Rating: ${this.ratingService.formatRating(worker.avgRating, ratingCount)}`,
+        `📝 Notes: ${worker.notes ?? "None"}`,
       ].join("\n"),
-      keyboard,
+      { parse_mode: "Markdown", ...keyboard },
     );
   }
 
@@ -537,20 +607,25 @@ export class WorkerScene {
       return;
     }
 
+    const workerCode = await this.ratingService.generateUniqueCode();
+
     await this.prisma.workerRecommendation.create({
       data: {
+        workerCode,
         residentId: resident.id,
         name: draft.name,
         phone: draft.phone,
         category: draft.category,
-        rating: draft.rating,
         notes,
         tags: deriveWorkerTags(draft.category, notes),
       },
     });
 
     ctx.session.workers = {};
-    await ctx.reply("Worker recommendation saved.");
+    await ctx.reply(
+      `✅ Worker recommendation saved!\n📛 Worker Code: *${workerCode}*\n\nResidents can use \`/ask rate ${workerCode} 5 star\` to rate this worker.`,
+      { parse_mode: "Markdown" },
+    );
     await this.showHome(ctx);
   }
 
@@ -580,24 +655,6 @@ export class WorkerScene {
     );
   }
 
-  private promptRating(ctx: BotContext, prefix: string) {
-    return ctx.reply(
-      "Choose a rating.",
-      Markup.inlineKeyboard([
-        [
-          Markup.button.callback("1", `${prefix}:1`),
-          Markup.button.callback("2", `${prefix}:2`),
-          Markup.button.callback("3", `${prefix}:3`),
-        ],
-        [
-          Markup.button.callback("4", `${prefix}:4`),
-          Markup.button.callback("5", `${prefix}:5`),
-          Markup.button.callback("Skip", `${prefix}:skip`),
-        ],
-      ]),
-    );
-  }
-
   private backToWorkersKeyboard() {
     return Markup.inlineKeyboard([
       [Markup.button.callback("Back", "workers:home")],
@@ -606,10 +663,8 @@ export class WorkerScene {
 
   private isEditField(
     field: string | undefined,
-  ): field is "name" | "phone" | "category" | "rating" | "notes" {
-    return ["name", "phone", "category", "rating", "notes"].includes(
-      field ?? "",
-    );
+  ): field is "name" | "phone" | "category" | "notes" {
+    return ["name", "phone", "category", "notes"].includes(field ?? "");
   }
 
   private title(value: string) {

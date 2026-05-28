@@ -68,16 +68,18 @@ export class AdminService {
     name: string;
     phone: string;
     category: string;
-    rating?: number | null;
     notes?: string | null;
   }) {
+    const workerCode = Array.from({ length: 3 }, () =>
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 36)]
+    ).join("");
     return this.prisma.workerRecommendation.create({
       data: {
+        workerCode,
         name: data.name,
         phone: data.phone,
         category: data.category,
         tags: [data.category],
-        rating: data.rating ?? null,
         notes: data.notes ?? null,
       },
     });
@@ -89,7 +91,6 @@ export class AdminService {
       name?: string;
       phone?: string;
       category?: string;
-      rating?: number | null;
       notes?: string | null;
       isActive?: boolean;
     },

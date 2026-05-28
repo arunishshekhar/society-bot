@@ -5,6 +5,7 @@ export type SearchIntentType =
   | "find_carpool"
   | "find_return"
   | "inform"
+  | "rate_worker"
   | "unknown";
 
 export interface SearchIntent {
@@ -22,6 +23,9 @@ export interface SearchIntent {
   target_type?: "vehicle" | "flat";
   target_id?: string;
   message?: string;
+  // Rate-specific extras
+  worker_code?: string;
+  stars?: number;
 }
 
 export function normalizeSearchIntent(value: unknown): SearchIntent {
@@ -71,6 +75,17 @@ export function normalizeSearchIntent(value: unknown): SearchIntent {
   const message =
     typeof record.message === "string" ? record.message : undefined;
 
+  const worker_code =
+    typeof record.worker_code === "string" && record.worker_code
+      ? record.worker_code.toUpperCase().trim()
+      : undefined;
+  const stars =
+    typeof record.stars === "number" &&
+    record.stars >= 1 &&
+    record.stars <= 5
+      ? Math.round(record.stars)
+      : undefined;
+
   return {
     type,
     category,
@@ -84,6 +99,8 @@ export function normalizeSearchIntent(value: unknown): SearchIntent {
     target_type,
     target_id,
     message,
+    worker_code,
+    stars,
   };
 }
 
@@ -95,6 +112,7 @@ function isIntentType(value: unknown): value is SearchIntentType {
     value === "find_carpool" ||
     value === "find_return" ||
     value === "inform" ||
+    value === "rate_worker" ||
     value === "unknown"
   );
 }
