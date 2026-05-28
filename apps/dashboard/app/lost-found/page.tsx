@@ -21,10 +21,12 @@ export default async function LostFoundPage({
 }) {
   const { tab = 'found' } = await searchParams;
 
-  const [foundItems, lostItems] = await Promise.all([
-    adminFetch<AdminRecord[]>('/admin/lost-found/found') ?? [],
-    adminFetch<AdminRecord[]>('/admin/lost-found/lost') ?? [],
+  const [foundItemsRaw, lostItemsRaw] = await Promise.all([
+    adminFetch<AdminRecord[]>('/admin/lost-found/found'),
+    adminFetch<AdminRecord[]>('/admin/lost-found/lost'),
   ]);
+  const foundItems = foundItemsRaw ?? [];
+  const lostItems = lostItemsRaw ?? [];
 
   return (
     <main className="container mx-auto max-w-6xl px-4 py-8">
