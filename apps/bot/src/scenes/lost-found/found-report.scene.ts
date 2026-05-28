@@ -18,7 +18,7 @@ export class FoundReportScene {
     ctx.session.foundItemStep = 'photo';
     await ctx.reply(
       '📦 *Report Found Item*\n\nPlease upload a photo of the item.\n(Photo helps the owner identify it)',
-      { parse_mode: 'MarkdownV2', reply_markup: { inline_keyboard: [[{ text: '❌ Cancel', callback_data: 'lf_cancel' }]] } }
+      { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '❌ Cancel', callback_data: 'lf_cancel' }]] } }
     );
   }
 

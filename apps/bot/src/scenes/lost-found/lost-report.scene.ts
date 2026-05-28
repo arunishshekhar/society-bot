@@ -20,7 +20,7 @@ export class LostReportScene {
     ctx.session.lostItemStep = 'description';
     await ctx.reply(
       '🔍 *Report Lost Item*\n\nDescribe what you lost in detail.\nInclude: color, type, brand, size, any distinctive features.\n\ne.g. "Black leather wallet with silver clip, contains Axis bank card"',
-      { parse_mode: 'MarkdownV2', reply_markup: { inline_keyboard: [[{ text: '❌ Cancel', callback_data: 'lf_cancel' }]] } }
+      { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '❌ Cancel', callback_data: 'lf_cancel' }]] } }
     );
   }
 
@@ -54,7 +54,7 @@ export class LostReportScene {
       const matches = await this.searchService.findMatchingFoundItems(aiDescription);
 
       if (matches.length > 0) {
-        await ctx.reply('🔍 *We found some possible matches!*\n\nHere are found items that might be yours:', { parse_mode: 'MarkdownV2' });
+        await ctx.reply('🔍 *We found some possible matches!*\n\nHere are found items that might be yours:', { parse_mode: 'Markdown' });
 
         for (const item of matches) {
           await ctx.telegram.sendPhoto(
@@ -65,7 +65,7 @@ export class LostReportScene {
                 `📦 *${item.originalDescription}*\n` +
                 `📍 Collect from: ${item.collectionLocation}\n` +
                 `🏠 Reported by: Flat ${item.flatNumber}`,
-              parse_mode: 'MarkdownV2',
+              parse_mode: 'Markdown',
               reply_markup: {
                 inline_keyboard: [[
                   { text: '✅ This is mine', callback_data: `lf_claim_${item.id}_${lostItem.id}` },

@@ -59,7 +59,7 @@ export class LostFoundManageScene {
     keyboard.push([{ text: '🏠 Back to Menu', callback_data: 'menu' }]);
 
     await ctx.reply(message, {
-      parse_mode: 'MarkdownV2',
+      parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: keyboard },
     });
   }
