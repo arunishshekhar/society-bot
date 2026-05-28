@@ -82,6 +82,7 @@ export interface BotSession extends Scenes.SceneSession<BotSceneSessionData> {
   };
   carpool?: {
     step?:
+      | "start"
       | "destination"
       | "departureTime"
       | "returnTime"
@@ -89,6 +90,9 @@ export interface BotSession extends Scenes.SceneSession<BotSceneSessionData> {
       | "time_filter";
     searchDirection?: string;
     postDraft?: {
+      startAddress?: string;
+      startLat?: number;
+      startLng?: number;
       destinationAddress?: string;
       destinationLat?: number;
       destinationLng?: number;

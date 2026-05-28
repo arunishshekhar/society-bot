@@ -129,7 +129,7 @@ export class ProfileScene {
         "",
         `Name: ${resident.name}`,
         `Flat: ${resident.flatNumber}`,
-        `Phone: ${resident.phone ?? "Not set"}`,
+        `Phone: ${resident.phone ? `[${resident.phone}](tel:${resident.phone.replace(/[^0-9+]/g, '')})` : "Not set"}`,
       ].join("\n"),
       Markup.inlineKeyboard([
         [

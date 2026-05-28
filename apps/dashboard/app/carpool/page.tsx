@@ -43,7 +43,7 @@ export default async function CarpoolPage({
               return (
                 <React.Fragment key={String(r.id)}>
                   <TableRow>
-                    <TableCell className="font-medium">{text((r as any).destinationAddress)}</TableCell>
+                    <TableCell className="font-medium">{(r as any).startAddress ?? 'Society'} → {text((r as any).destinationAddress)}</TableCell>
                     <TableCell>{text(r.departureTime)}</TableCell>
                     <TableCell>{text(r.returnTime)}</TableCell>
                     <TableCell>{text(r.seatsAvailable)}</TableCell>

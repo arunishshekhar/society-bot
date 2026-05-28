@@ -33,15 +33,15 @@ export class CarpoolPostScene {
     ctx.session.carpool = {
       ...ctx.session.carpool,
       postDraft: draft,
-      step: "destination",
+      step: "start",
     };
 
-    if (draft.destinationAddress) {
-      // Pre-fill destination from /ask intent — search directly without a Proxy
-      await this.searchDestination(ctx, draft.destinationAddress);
-    } else {
-      await ctx.reply("Where are you going?\nType the destination name.");
-    }
+    await ctx.reply(
+      "Where are you starting from?\nType the location name or select below.",
+      Markup.inlineKeyboard([
+        [Markup.button.callback("🏢 The Society Location", "carpool_post:start_society")]
+      ])
+    );
   }
 
   @Command(["ask", "menu", "exit"])
@@ -65,8 +65,10 @@ export class CarpoolPostScene {
     const text = ctx.text?.trim();
     if (!step || !text) return;
 
-    if (step === "destination") {
-      await this.searchDestination(ctx, text);
+    if (step === "start") {
+      await this.searchLocation(ctx, text, "start");
+    } else if (step === "destination") {
+      await this.searchLocation(ctx, text, "destination");
     } else if (step === "departureTime") {
       // Basic validation
       if (!text.match(/\d{1,2}:\d{2}\s*(AM|PM)/i)) {
@@ -86,8 +88,8 @@ export class CarpoolPostScene {
       const results = await this.orsService.getRoutes(
         draft.destinationLat!,
         draft.destinationLng!,
-        this.societyLat,
-        this.societyLng,
+        draft.startLat!,
+        draft.startLng!,
       );
       ctx.session.carpool!.routeResults = results;
 
@@ -109,6 +111,38 @@ export class CarpoolPostScene {
     }
   }
 
+  @Action("carpool_post:start_society")
+  async setStartSociety(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    ctx.session.carpool!.postDraft!.startAddress = "The Society Location";
+    ctx.session.carpool!.postDraft!.startLat = this.societyLat;
+    ctx.session.carpool!.postDraft!.startLng = this.societyLng;
+    ctx.session.carpool!.step = "destination";
+
+    if (ctx.session.carpool!.postDraft!.destinationAddress && !ctx.session.carpool!.postDraft!.destinationLat) {
+       await this.searchLocation(ctx, ctx.session.carpool!.postDraft!.destinationAddress, "destination");
+    } else {
+       await ctx.reply("Where are you going?\nType the destination name or select below.", Markup.inlineKeyboard([[Markup.button.callback("🏢 The Society Location", "carpool_post:dest_society")]]));
+    }
+  }
+
+  @Action("carpool_post:dest_society")
+  async setDestSociety(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    ctx.session.carpool!.postDraft!.destinationAddress = "The Society Location";
+    ctx.session.carpool!.postDraft!.destinationLat = this.societyLat;
+    ctx.session.carpool!.postDraft!.destinationLng = this.societyLng;
+    
+    await this.calculateRoutesAndPrompt(ctx);
+  }
+
+  @Action("carpool_post:retry_start")
+  async retryStart(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    ctx.session.carpool!.step = "start";
+    await ctx.reply("Type the starting location name again.");
+  }
+
   @Action("carpool_post:retry_dest")
   async retryDest(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
@@ -116,27 +150,48 @@ export class CarpoolPostScene {
     await ctx.reply("Type the destination name again.");
   }
 
-  @Action(/carpool_post:place:\d+/)
+  @Action(/carpool_post:place_(start|destination):\d+/)
   async selectPlace(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
     const match =
       ctx.callbackQuery && "data" in ctx.callbackQuery
-        ? ctx.callbackQuery.data.match(/carpool_post:place:(\d+)/)
+        ? ctx.callbackQuery.data.match(/carpool_post:place_(start|destination):(\d+)/)
         : null;
     if (!match) return;
-    const index = parseInt(match[1]);
+    
+    const type = match[1];
+    const index = parseInt(match[2]);
     const place = ctx.session.carpool?.placeResults?.[index];
     if (!place) return;
 
-    ctx.session.carpool!.postDraft!.destinationAddress = place.name;
-    ctx.session.carpool!.postDraft!.destinationLat = place.lat;
-    ctx.session.carpool!.postDraft!.destinationLng = place.lng;
+    if (type === "start") {
+      ctx.session.carpool!.postDraft!.startAddress = place.name;
+      ctx.session.carpool!.postDraft!.startLat = place.lat;
+      ctx.session.carpool!.postDraft!.startLng = place.lng;
+      ctx.session.carpool!.step = "destination";
+      
+      if (ctx.session.carpool!.postDraft!.destinationAddress && !ctx.session.carpool!.postDraft!.destinationLat) {
+         await this.searchLocation(ctx, ctx.session.carpool!.postDraft!.destinationAddress, "destination");
+      } else {
+         await ctx.reply("Where are you going?\nType the destination name or select below.", Markup.inlineKeyboard([[Markup.button.callback("🏢 The Society Location", "carpool_post:dest_society")]]));
+      }
+    } else {
+      ctx.session.carpool!.postDraft!.destinationAddress = place.name;
+      ctx.session.carpool!.postDraft!.destinationLat = place.lat;
+      ctx.session.carpool!.postDraft!.destinationLng = place.lng;
+      await this.calculateRoutesAndPrompt(ctx);
+    }
+  }
+
+  private async calculateRoutesAndPrompt(ctx: BotContext) {
+    const draft = ctx.session.carpool!.postDraft!;
+    if (!draft.startLat || !draft.startLng || !draft.destinationLat || !draft.destinationLng) return;
 
     const results = await this.orsService.getRoutes(
-      this.societyLat,
-      this.societyLng,
-      place.lat,
-      place.lng,
+      draft.startLat,
+      draft.startLng,
+      draft.destinationLat,
+      draft.destinationLng,
     );
     ctx.session.carpool!.routeResults = results;
 
@@ -450,12 +505,12 @@ export class CarpoolPostScene {
     const draft = ctx.session.carpool!.postDraft!;
 
     let text = `✅ *Review your carpool:*\n\n`;
-    text += `🚗 *Morning: ${draft.destinationAddress}*\n`;
+    text += `🚗 *Trip: ${draft.startAddress} → ${draft.destinationAddress}*\n`;
     text += `   ${draft.morningDistanceKm} km\n`;
     text += `   Departs: ${draft.departureTime} · ${draft.type === "RECURRING" ? draft.recurringDays?.join(",") : "One Time"} · ${draft.seatsAvailable} seats\n`;
 
     if (draft.hasReturn) {
-      text += `\n🏠 *Return: ${draft.destinationAddress} → Home*\n`;
+      text += `\n🏠 *Return: ${draft.destinationAddress} → ${draft.startAddress}*\n`;
       text += `   Departs: ${draft.returnTime} · ${draft.returnSeatsAvailable} seats\n`;
     }
 
@@ -485,6 +540,9 @@ export class CarpoolPostScene {
         type: draft.type as any,
         recurringDays: draft.recurringDays ?? [],
         oneTimeDate: draft.oneTimeDate,
+        startAddress: draft.startAddress,
+        startLat: draft.startLat,
+        startLng: draft.startLng,
         destinationAddress: draft.destinationAddress!,
         destinationLat: draft.destinationLat!,
         destinationLng: draft.destinationLng!,
@@ -510,11 +568,11 @@ export class CarpoolPostScene {
     await ctx.scene.enter("carpool");
   }
 
-  private async searchDestination(ctx: BotContext, query: string) {
+  private async searchLocation(ctx: BotContext, query: string, targetStep: "start" | "destination") {
     const results = await this.photonService.search(query);
     if (!results.length) {
       await ctx.reply(
-        "No results found for that destination. Please type another name.",
+        `No results found for that location. Please type another name.`,
       );
       return;
     }
@@ -523,17 +581,17 @@ export class CarpoolPostScene {
     const buttons = results.map((r, i) => [
       Markup.button.callback(
         `${i + 1}. ${r.name}, ${r.address}`.substring(0, 60),
-        `carpool_post:place:${i}`,
+        `carpool_post:place_${targetStep}:${i}`,
       ),
     ]);
     await ctx.reply(
-      "Select your destination:",
+      `Select your ${targetStep === 'start' ? 'starting location' : 'destination'}:`,
       Markup.inlineKeyboard([
         ...buttons,
         [
           Markup.button.callback(
             "Not listed, type again",
-            "carpool_post:retry_dest",
+            `carpool_post:retry_${targetStep === 'start' ? 'start' : 'dest'}`,
           ),
         ],
       ]),

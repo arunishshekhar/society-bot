@@ -254,7 +254,7 @@ Respond ONLY with valid JSON.`,
         ? `Flat ${w.resident.flatNumber}`
         : "Admin";
       await ctx.reply(
-        `👷 *${w.name}* [${w.workerCode}] — ${w.category}\n${ratingStr}\n📞 ${w.phone}${w.notes ? `\n📝 ${w.notes}` : ""}\nAdded by: ${addedBy}`,
+        `👷 *${w.name}* [${w.workerCode}] — ${w.category}\n${ratingStr}\n📞 [${w.phone}](tel:${w.phone.replace(/[^0-9+]/g, '')})${w.notes ? `\n📝 ${w.notes}` : ""}\nAdded by: ${addedBy}`,
         { parse_mode: "Markdown" },
       );
     }

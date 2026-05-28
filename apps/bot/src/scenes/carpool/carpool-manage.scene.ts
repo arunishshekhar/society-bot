@@ -47,11 +47,11 @@ export class CarpoolManageScene {
     });
     const routeLines = routes.map(
       (r, i) =>
-        `${i + 1}. ${r.destinationAddress} - ${r.departureTime} (${r.isPaused ? "Paused" : "Active"})`,
+        `${i + 1}. ${r.startAddress ?? 'Society'} → ${r.destinationAddress} - ${r.departureTime} (${r.isPaused ? "Paused" : "Active"})`,
     );
     const routeButtons = routes.map((r) => [
       Markup.button.callback(
-        `${r.destinationAddress} - ${r.departureTime}`,
+        `${r.startAddress ?? 'Society'} → ${r.destinationAddress} - ${r.departureTime}`,
         `carpool_manage:select:${r.id}`,
       ),
     ]);
@@ -90,7 +90,7 @@ export class CarpoolManageScene {
     });
     if (!route) return this.showMine(ctx);
 
-    const text = `🚗 *Morning:* ${route.destinationAddress}\nDeparts: ${route.departureTime} · Seats: ${route.seatsAvailable}\n🏠 *Return:* ${route.hasReturn ? `Yes (${route.returnTime})` : "No"}`;
+    const text = `🚗 *Morning:* ${route.startAddress ?? 'Society'} → ${route.destinationAddress}\nDeparts: ${route.departureTime} · Seats: ${route.seatsAvailable}\n🏠 *Return:* ${route.hasReturn ? `Yes (${route.returnTime})` : "No"}`;
 
     await ctx.reply(text, {
       parse_mode: "Markdown",

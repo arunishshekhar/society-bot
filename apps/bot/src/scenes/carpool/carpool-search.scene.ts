@@ -161,7 +161,7 @@ export class CarpoolSearchScene {
         ? "Your pickup is on route"
         : `~${res.distanceMeters}m from route`;
 
-      let text = `${statusIcon} *${r.resident.flatNumber}* · ${r.destinationAddress}\n`;
+      let text = `${statusIcon} *${r.resident.flatNumber}* · ${r.startAddress ?? 'Society'} → ${r.destinationAddress}\n`;
       text += `   Departs ${timeStr} · ${r.type === "RECURRING" ? "Recurring" : "One Time"} · ${seatsStr} seats\n`;
       text += `   📍 ${locStr}`;
 

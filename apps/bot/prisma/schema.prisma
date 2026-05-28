@@ -78,6 +78,9 @@ model CarpoolRoute {
   recurringDays       String[]                
   oneTimeDate         DateTime?               
 
+  startAddress        String?
+  startLat            Float?
+  startLng            Float?
   destinationAddress  String
   destinationLat      Float
   destinationLng      Float

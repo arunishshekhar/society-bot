@@ -246,26 +246,63 @@ export class AdminController {
     const imageBuffer = file?.buffer ?? null;
 
     let sent = 0;
+    let useMarkdown = true;
     for (const resident of residents) {
       try {
-        if (imageBuffer) {
-          await this.bot.telegram.sendPhoto(
-            Number(resident.telegramId),
-            { source: imageBuffer },
-            {
-              caption: `Society Notice\n\n${message}`,
-              parse_mode: "MarkdownV2",
-            },
-          );
+        if (useMarkdown) {
+          if (imageBuffer) {
+            await this.bot.telegram.sendPhoto(
+              Number(resident.telegramId),
+              { source: imageBuffer },
+              {
+                caption: `Society Notice\n\n${message}`,
+                parse_mode: "MarkdownV2",
+              },
+            );
+          } else {
+            await this.bot.telegram.sendMessage(
+              Number(resident.telegramId),
+              `Society Notice\n\n${message}`,
+              { parse_mode: "MarkdownV2" },
+            );
+          }
+          sent += 1;
         } else {
-          await this.bot.telegram.sendMessage(
-            Number(resident.telegramId),
-            `Society Notice\n\n${message}`,
-            { parse_mode: "MarkdownV2" },
-          );
+          if (imageBuffer) {
+            await this.bot.telegram.sendPhoto(
+              Number(resident.telegramId),
+              { source: imageBuffer },
+              { caption: `Society Notice\n\n${message}` }
+            );
+          } else {
+            await this.bot.telegram.sendMessage(
+              Number(resident.telegramId),
+              `Society Notice\n\n${message}`
+            );
+          }
+          sent += 1;
         }
-        sent += 1;
-      } catch {
+      } catch (error: any) {
+        if (useMarkdown && error.response?.description?.includes("can't parse entities")) {
+          useMarkdown = false;
+          try {
+            if (imageBuffer) {
+              await this.bot.telegram.sendPhoto(
+                Number(resident.telegramId),
+                { source: imageBuffer },
+                { caption: `Society Notice\n\n${message}` }
+              );
+            } else {
+              await this.bot.telegram.sendMessage(
+                Number(resident.telegramId),
+                `Society Notice\n\n${message}`
+              );
+            }
+            sent += 1;
+          } catch {
+            // Ignore fallback failure
+          }
+        }
         // Keep broadcasting to remaining residents.
       }
     }

@@ -242,7 +242,7 @@ export class MicroServiceScene {
     const metadata = readServiceMetadata(service.metadata);
     const contact =
       metadata.contactPreference === "phone"
-        ? (service.resident?.phone ?? "Phone not available")
+        ? (service.resident?.phone ? `[${service.resident.phone}](tel:${service.resident.phone.replace(/[^0-9+]/g, '')})` : "Phone not available")
         : service.resident?.telegramUsername
           ? `@${service.resident.telegramUsername}`
           : service.resident
@@ -251,10 +251,11 @@ export class MicroServiceScene {
 
     await ctx.reply(
       [
-        service.name,
+        `*${service.name}*`,
         `Flat: ${service.resident?.flatNumber ?? "Admin"}`,
         `Contact: ${contact}`,
       ].join("\n"),
+      { parse_mode: "Markdown" }
     );
   }
 
