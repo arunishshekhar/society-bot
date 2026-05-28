@@ -147,19 +147,15 @@ export class AppUpdate {
     await this.enterScene(ctx, "lost_found_manage");
   }
 
-  @Action(/lf_confirm_(.+)_(.+)/)
+  @Action(/lf:c:(.{8}):(.{8})/)
   async lfConfirm(@Ctx() ctx: BotContext & { match: RegExpMatchArray }) {
     await ctx.answerCbQuery();
     if (!(await this.ensureActiveOnboardedResident(ctx))) return;
-    const match = ctx.match as RegExpMatchArray;
-    const foundItemId = match[1];
-    const lostItemId = match[2];
-    
-    // Lost person claims found item -> enter manage scene to show collection details
+    // Short IDs — handlers just redirect to manage scene; full IDs not needed
     await this.enterScene(ctx, "lost_found_manage");
   }
 
-  @Action(/lf_reject_(.+)_(.+)/)
+  @Action(/lf:r:(.{8}):(.{8})/)
   async lfReject(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery("Okay, we will keep looking!");
     await ctx.editMessageReplyMarkup({ inline_keyboard: [] });

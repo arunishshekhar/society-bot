@@ -75,8 +75,8 @@ export class LostFoundService {
             parse_mode: 'Markdown',
             reply_markup: {
               inline_keyboard: [[
-                { text: '✅ Yes, this is mine', callback_data: `lf_confirm_${foundItem.id}_${lostReport.id}` },
-                { text: '❌ Not mine', callback_data: `lf_reject_${foundItem.id}_${lostReport.id}` },
+                { text: '✅ Yes, this is mine', callback_data: `lf:c:${foundItem.id.slice(0,8)}:${lostReport.id.slice(0,8)}` },
+                { text: '❌ Not mine', callback_data: `lf:r:${foundItem.id.slice(0,8)}:${lostReport.id.slice(0,8)}` },
               ]],
             },
           }
@@ -137,8 +137,8 @@ export class LostFoundService {
             parse_mode: 'Markdown',
             reply_markup: {
               inline_keyboard: [[
-                { text: '✅ Yes, this is mine', callback_data: `lf_confirm_${foundItem.id}_${lostItem.id}` },
-                { text: '❌ Not mine', callback_data: `lf_reject_${foundItem.id}_${lostItem.id}` },
+                { text: '✅ Yes, this is mine', callback_data: `lf:c:${foundItem.id.slice(0,8)}:${lostItem.id.slice(0,8)}` },
+                { text: '❌ Not mine', callback_data: `lf:r:${foundItem.id.slice(0,8)}:${lostItem.id.slice(0,8)}` },
               ]],
             },
           }
