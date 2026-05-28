@@ -6,6 +6,7 @@ import {
   resolveLostItemAction,
   deleteLostItemAction,
 } from '../actions/admin';
+import { ReprocessButton } from './reprocess-button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button, buttonVariants } from '@/components/ui/button';
 import Link from 'next/link';
@@ -31,8 +32,8 @@ export default async function LostFoundPage({
   return (
     <main className="container mx-auto max-w-6xl px-4 py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Lost & Found</h1>
-        <div className="flex gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight">Lost &amp; Found</h1>
+        <div className="flex items-center gap-2 flex-wrap">
           <Link
             href="/lost-found?tab=found"
             className={buttonVariants({ variant: tab === 'found' ? 'default' : 'outline' })}
@@ -45,6 +46,7 @@ export default async function LostFoundPage({
           >
             Lost Items
           </Link>
+          <ReprocessButton />
         </div>
       </div>
 

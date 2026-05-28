@@ -216,3 +216,13 @@ export async function deleteLostItemAction(formData: FormData) {
   revalidatePath('/lost-found');
   redirect('/lost-found?tab=lost');
 }
+
+export async function reprocessLostFoundAction(): Promise<{
+  message: string;
+  foundProcessed: number;
+  lostProcessed: number;
+}> {
+  const res = await apiFetch('/admin/lost-found/reprocess', 'POST');
+  revalidatePath('/lost-found');
+  return res as any;
+}

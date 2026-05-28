@@ -19,6 +19,7 @@ import { Telegraf } from "telegraf";
 import { AdminApiKeyGuard } from "./admin-api-key.guard";
 import { AdminService } from "./admin.service";
 import { BotContext } from "../../types/bot-context";
+import { LostFoundService } from "../lost-found/lost-found.service";
 
 @Controller("admin")
 @UseGuards(AdminApiKeyGuard)
@@ -27,6 +28,7 @@ export class AdminController {
 
   constructor(
     private readonly admin: AdminService,
+    private readonly lostFound: LostFoundService,
     @InjectBot() private readonly bot: Telegraf<BotContext>,
   ) {}
 
@@ -392,6 +394,29 @@ export class AdminController {
   lostFoundMatches() {
     this.logger.log("GET /admin/lost-found/matches");
     return this.admin.lostFoundMatches();
+  }
+
+  @Post("lost-found/reprocess")
+  async reprocessLostFound() {
+    this.logger.log("POST /admin/lost-found/reprocess");
+    // Fetch all open found items and re-scan each against open lost reports.
+    // Does NOT re-run AI description generation — only the search/matching step.
+    const foundItems = await this.admin.foundItems("OPEN");
+    let notified = 0;
+    for (const item of foundItems) {
+      await this.lostFound.scanAndNotifyLostReporters(item as any);
+      notified++;
+    }
+    // Also scan in reverse: each open lost item against all open found items.
+    const lostItems = await this.admin.lostItems("OPEN");
+    for (const item of lostItems) {
+      await this.lostFound.scanAndNotifyFoundItems(item as any);
+    }
+    return {
+      message: `Reprocessed ${foundItems.length} found item(s) and ${lostItems.length} lost item(s). New notifications sent: check bot logs.`,
+      foundProcessed: foundItems.length,
+      lostProcessed: lostItems.length,
+    };
   }
 
   // ── Analytics ──────────────────────────────────────────────
