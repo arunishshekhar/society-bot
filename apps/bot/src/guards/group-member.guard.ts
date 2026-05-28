@@ -21,9 +21,17 @@ export class GroupMemberGuard implements CanActivate {
     }
 
     try {
-      const member = await ctx.telegram.getChatMember(groupId, userId);
-      const allowedStatuses = ["member", "administrator", "creator"];
-      const allowed = allowedStatuses.includes(member.status);
+      // Parse numeric group IDs (e.g. "-1003996463895") so getChatMember
+      // receives a number, which is required for supergroups.
+      const chatId = /^-?\d+$/.test(groupId) ? Number(groupId) : groupId;
+      const member = await ctx.telegram.getChatMember(chatId, userId);
+
+      // "restricted" members in supergroups are still valid members when
+      // is_member is true. Always include it alongside the standard statuses.
+      const allowedStatuses = ["member", "administrator", "creator", "restricted"];
+      const allowed =
+        allowedStatuses.includes(member.status) &&
+        (member.status !== "restricted" || (member as any).is_member !== false);
 
       if (!allowed) {
         await this.replyNotMember(ctx, groupId);
