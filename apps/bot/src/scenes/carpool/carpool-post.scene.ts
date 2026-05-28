@@ -1,5 +1,5 @@
 import { UseGuards } from "@nestjs/common";
-import { Action, Ctx, On, Scene, SceneEnter } from "nestjs-telegraf";
+import { Action, Command, Ctx, On, Scene, SceneEnter } from "nestjs-telegraf";
 import { Markup } from "telegraf";
 import { GroupMemberGuard } from "../../guards/group-member.guard";
 import { BotContext } from "../../types/bot-context";
@@ -9,6 +9,8 @@ import {
   PlaceResult,
 } from "../../modules/carpool/photon.service";
 import { OrsService, OrsRoute } from "../../modules/carpool/ors.service";
+import { SearchService } from "../../modules/search/search.service";
+import { mainMenuKeyboard } from "../../keyboards/main-menu.keyboard";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -22,6 +24,7 @@ export class CarpoolPostScene {
     private readonly prisma: PrismaService,
     private readonly photonService: PhotonService,
     private readonly orsService: OrsService,
+    private readonly searchService: SearchService,
   ) {}
 
   @SceneEnter()
@@ -39,6 +42,21 @@ export class CarpoolPostScene {
     } else {
       await ctx.reply("Where are you going?\nType the destination name.");
     }
+  }
+
+  @Command(["ask", "menu", "exit"])
+  async onAskCommand(@Ctx() ctx: BotContext) {
+    const text = (ctx.message as { text?: string })?.text ?? "";
+
+    if (text.startsWith("/menu") || text.startsWith("/exit")) {
+      await ctx.scene.leave();
+      await ctx.reply("Society Bot", mainMenuKeyboard());
+      return;
+    }
+
+    const query = text.replace(/^\/ask\s*/i, "").trim();
+    await ctx.scene.leave();
+    await this.searchService.handleAsk(ctx, query);
   }
 
   @On("text")

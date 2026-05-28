@@ -1,5 +1,5 @@
 import { UseGuards } from "@nestjs/common";
-import { Action, Ctx, On, Scene, SceneEnter } from "nestjs-telegraf";
+import { Action, Command, Ctx, On, Scene, SceneEnter } from "nestjs-telegraf";
 import { Markup } from "telegraf";
 import { GroupMemberGuard } from "../../guards/group-member.guard";
 import { BotContext } from "../../types/bot-context";
@@ -7,6 +7,8 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { PhotonService } from "../../modules/carpool/photon.service";
 import { PolylineService } from "../../modules/carpool/polyline.service";
 import { Direction } from "@prisma/client";
+import { SearchService } from "../../modules/search/search.service";
+import { mainMenuKeyboard } from "../../keyboards/main-menu.keyboard";
 
 @Scene("carpool_search")
 @UseGuards(GroupMemberGuard)
@@ -15,6 +17,7 @@ export class CarpoolSearchScene {
     private readonly prisma: PrismaService,
     private readonly photonService: PhotonService,
     private readonly polylineService: PolylineService,
+    private readonly searchService: SearchService,
   ) {}
 
   @SceneEnter()
@@ -29,6 +32,21 @@ export class CarpoolSearchScene {
         "Where are you returning from?\nType your current location.",
       );
     }
+  }
+
+  @Command(["ask", "menu", "exit"])
+  async onAskCommand(@Ctx() ctx: BotContext) {
+    const text = (ctx.message as { text?: string })?.text ?? "";
+
+    if (text.startsWith("/menu") || text.startsWith("/exit")) {
+      await ctx.scene.leave();
+      await ctx.reply("Society Bot", mainMenuKeyboard());
+      return;
+    }
+
+    const query = text.replace(/^\/ask\s*/i, "").trim();
+    await ctx.scene.leave();
+    await this.searchService.handleAsk(ctx, query);
   }
 
   @On("text")
