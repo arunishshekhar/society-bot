@@ -14,8 +14,9 @@ describe("validation utilities", () => {
   });
 
   it("normalizes and validates flat numbers", () => {
-    expect(normalizeFlatNumber("a-101")).toBe("A-101");
-    expect(isValidFlatNumber("A-101")).toBe(true);
+    expect(normalizeFlatNumber("03-12-03")).toBe("03-12-03");
+    expect(isValidFlatNumber("03-12-03")).toBe(true);
+    expect(isValidFlatNumber("3123")).toBe(true);
     expect(isValidFlatNumber("Tower A")).toBe(false);
   });
 

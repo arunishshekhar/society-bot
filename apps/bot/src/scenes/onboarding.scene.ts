@@ -52,14 +52,14 @@ export class OnboardingScene {
       }
 
       ctx.session.onboarding = { ...state, step: "flat", name: text };
-      await ctx.reply("Thanks. What is your flat number? Example: A-101");
+      await ctx.reply("Thanks. What is your flat number? You can enter formats like 03-12-03, 3-12-2, or 3123.");
       return;
     }
 
     if (state.step === "flat") {
       if (!isValidFlatNumber(text)) {
         await ctx.reply(
-          "Please enter a valid flat number. Pattern: Tower-Floor-Unit (e.g., 03-12-03 for Tower 3, Floor 12, Unit 3).",
+          "Please enter a valid flat number (e.g., 03-12-03, 3-12-2, or 3123).",
         );
         return;
       }
@@ -247,7 +247,7 @@ export class OnboardingScene {
 
     if (step === "flat") {
       await ctx.reply(
-        "What is your flat number? Pattern: Tower-Floor-Unit (e.g., 03-12-03 for Tower 3, Floor 12, Unit 3)",
+        "What is your flat number? You can enter formats like 03-12-03, 3-12-2, or 3123.",
       );
       return;
     }
