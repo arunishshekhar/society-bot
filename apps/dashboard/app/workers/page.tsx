@@ -115,18 +115,6 @@ export default async function WorkersPage({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Rating</label>
-                <Select name="rating">
-                  <SelectTrigger className="bg-background">
-                    <SelectValue placeholder="No rating" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">No rating</SelectItem>
-                    {[1, 2, 3, 4, 5].map((n) => <SelectItem key={n} value={String(n)}>{n} ★</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
               <div className="grid gap-2 sm:col-span-2">
                 <label className="text-sm font-medium">Notes</label>
                 <Textarea name="notes" placeholder="Notes" className="bg-background resize-y" rows={2} />
@@ -147,10 +135,11 @@ export default async function WorkersPage({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Code</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Category</TableHead>
-              <TableHead>Rating</TableHead>
+              <TableHead>Avg Rating</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Added by</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -160,10 +149,11 @@ export default async function WorkersPage({
             {workerList.map((w) => (
               <React.Fragment key={String(w.id)}>
                 <TableRow>
+                  <TableCell className="font-mono text-xs font-semibold text-muted-foreground">{text(w.workerCode)}</TableCell>
                   <TableCell className="font-medium">{text(w.name)}</TableCell>
                   <TableCell>{text(w.phone)}</TableCell>
                   <TableCell className="capitalize">{text(w.category)}</TableCell>
-                  <TableCell>{w.rating ? `${w.rating} ★` : '-'}</TableCell>
+                  <TableCell>{w.avgRating ? `⭐ ${w.avgRating}` : '-'}</TableCell>
                   <TableCell>
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
                       w.isBanned ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : w.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-muted text-muted-foreground'
@@ -215,18 +205,6 @@ export default async function WorkersPage({
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="grid gap-2">
-                          <label className="text-xs font-medium">Rating</label>
-                          <Select name="rating" defaultValue={String(w.rating ?? '')}>
-                            <SelectTrigger className="bg-background">
-                              <SelectValue placeholder="No rating" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">No rating</SelectItem>
-                              {[1, 2, 3, 4, 5].map((n) => <SelectItem key={n} value={String(n)}>{n} ★</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
                         <div className="grid gap-2 sm:col-span-2">
                           <label className="text-xs font-medium">Notes</label>
                           <Textarea name="notes" defaultValue={String(w.notes ?? '')} placeholder="Notes" className="bg-background resize-y" rows={2} />
@@ -245,7 +223,7 @@ export default async function WorkersPage({
             ))}
             {workerList.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
+                <TableCell colSpan={8} className="h-24 text-center">
                   No workers found.
                 </TableCell>
               </TableRow>

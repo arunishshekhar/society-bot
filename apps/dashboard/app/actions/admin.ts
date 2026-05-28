@@ -26,12 +26,10 @@ export async function deleteResidentAction(formData: FormData) {
 
 // ── Workers ────────────────────────────────────────────────
 export async function createWorkerAction(formData: FormData) {
-  const rating = formData.get('rating');
   await apiFetch('/admin/workers', 'POST', {
     name: formData.get('name'),
     phone: formData.get('phone'),
     category: formData.get('category'),
-    rating: rating ? Number(rating) : null,
     notes: formData.get('notes') || null,
   });
   revalidatePath('/workers');
@@ -40,12 +38,10 @@ export async function createWorkerAction(formData: FormData) {
 
 export async function updateWorkerAction(formData: FormData) {
   const id = String(formData.get('id'));
-  const rating = formData.get('rating');
   await apiFetch(`/admin/workers/${id}`, 'PATCH', {
     name: formData.get('name') || undefined,
     phone: formData.get('phone') || undefined,
     category: formData.get('category') || undefined,
-    rating: rating ? Number(rating) : null,
     notes: formData.get('notes') || null,
   });
   revalidatePath('/workers');

@@ -95,7 +95,12 @@ export class AdminService {
       isActive?: boolean;
     },
   ) {
-    return this.prisma.workerRecommendation.update({ where: { id }, data });
+    // Explicitly pick known fields — never forward unknown keys to Prisma
+    const { name, phone, category, notes, isActive } = data;
+    return this.prisma.workerRecommendation.update({
+      where: { id },
+      data: { name, phone, category, notes, isActive },
+    });
   }
 
   deleteWorker(id: string) {
