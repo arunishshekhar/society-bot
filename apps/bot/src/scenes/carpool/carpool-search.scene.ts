@@ -22,16 +22,24 @@ export class CarpoolSearchScene {
 
   @SceneEnter()
   async enter(@Ctx() ctx: BotContext) {
-    ctx.session.carpool = { ...ctx.session.carpool, step: "pickup_location" };
+    // Reset search state but keep any pre-set direction
+    ctx.session.carpool = { ...ctx.session.carpool, step: "choose_direction" };
 
-    const dir = ctx.session.carpool.searchDirection as Direction;
-    if (dir === "MORNING") {
-      await ctx.reply("Where should they pick you up?\nType your location.");
-    } else {
-      await ctx.reply(
-        "Where are you returning from?\nType your current location.",
-      );
-    }
+    await ctx.reply(
+      "🔍 *Find a Pool*\n\nAre you looking for a morning or return ride?",
+      {
+        parse_mode: "Markdown",
+        reply_markup: Markup.inlineKeyboard([
+          [
+            Markup.button.callback("🌅 Morning (Home → Work)", "carpool_search:dir:MORNING"),
+          ],
+          [
+            Markup.button.callback("🏠 Return (Work → Home)", "carpool_search:dir:RETURN"),
+          ],
+          [Markup.button.callback("🔙 Back", "carpool_search:cancel")],
+        ]).reply_markup,
+      },
+    );
   }
 
   @Command(["ask", "menu", "exit"])
@@ -47,6 +55,25 @@ export class CarpoolSearchScene {
     const query = text.replace(/^\/ask\s*/i, "").trim();
     await ctx.scene.leave();
     await this.searchService.handleAsk(ctx, query);
+  }
+
+  @Action(/carpool_search:dir:(MORNING|RETURN)/)
+  async chooseDirection(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    const match =
+      ctx.callbackQuery && "data" in ctx.callbackQuery
+        ? ctx.callbackQuery.data.match(/carpool_search:dir:(MORNING|RETURN)/)
+        : null;
+    if (!match) return;
+    const direction = match[1] as Direction;
+    ctx.session.carpool!.searchDirection = direction;
+    ctx.session.carpool!.step = "pickup_location";
+
+    if (direction === "MORNING") {
+      await ctx.reply("Where should they pick you up?\nType your pickup location.");
+    } else {
+      await ctx.reply("Where are you returning from?\nType your current location.");
+    }
   }
 
   @On("text")
@@ -91,6 +118,16 @@ export class CarpoolSearchScene {
       }
       const time = text.toLowerCase() === "any" ? null : text;
       await this.findMatches(ctx, time);
+    } else if (step === "return_time_filter") {
+      if (
+        text.toLowerCase() !== "any" &&
+        !text.match(/\d{1,2}:\d{2}\s*(AM|PM)/i)
+      ) {
+        await ctx.reply('Please use format like 6:00 PM or type "any"');
+        return;
+      }
+      const time = text.toLowerCase() === "any" ? null : text;
+      await this.findMatches(ctx, time);
     }
   }
 
@@ -119,10 +156,18 @@ export class CarpoolSearchScene {
       pickupAddress: place.name,
     };
 
-    ctx.session.carpool!.step = "time_filter";
-    await ctx.reply(
-      'Around what time?\n(e.g. 9:00 AM or type "any" for any time)',
-    );
+    const direction = ctx.session.carpool!.searchDirection as Direction;
+    if (direction === "MORNING") {
+      ctx.session.carpool!.step = "time_filter";
+      await ctx.reply(
+        '🕐 Around what time should they pick you up?\n(e.g. 8:00 AM or type "any" for any time)',
+      );
+    } else {
+      ctx.session.carpool!.step = "return_time_filter";
+      await ctx.reply(
+        '🕐 Around what time do you want to return?\n(e.g. 6:00 PM or type "any" for any time)',
+      );
+    }
   }
 
   async findMatches(ctx: BotContext, time: string | null) {

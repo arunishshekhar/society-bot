@@ -86,8 +86,10 @@ export interface BotSession extends Scenes.SceneSession<BotSceneSessionData> {
       | "destination"
       | "departureTime"
       | "returnTime"
+      | "choose_direction"
       | "pickup_location"
-      | "time_filter";
+      | "time_filter"
+      | "return_time_filter";
     searchDirection?: string;
     postDraft?: {
       startAddress?: string;
