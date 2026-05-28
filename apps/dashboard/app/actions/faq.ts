@@ -2,23 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-
-const api = process.env.ADMIN_API_URL ?? 'http://localhost:3001';
-const key = process.env.ADMIN_API_KEY ?? '';
-
-async function apiFetch(path: string, method: string, body?: unknown) {
-  try {
-    const res = await fetch(`${api}${path}`, {
-      method,
-      headers: { 'content-type': 'application/json', 'x-admin-api-key': key },
-      body: body ? JSON.stringify(body) : undefined,
-      cache: 'no-store',
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+import { apiFetch } from '../lib/api-client';
 
 export async function createFaqAction(formData: FormData) {
   await apiFetch('/admin/faqs', 'POST', {

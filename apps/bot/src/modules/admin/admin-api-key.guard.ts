@@ -3,7 +3,8 @@ import {
   ExecutionContext,
   Injectable,
   UnauthorizedException,
-} from "@nestjs/common";
+} from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
 
 @Injectable()
 export class AdminApiKeyGuard implements CanActivate {
@@ -12,12 +13,33 @@ export class AdminApiKeyGuard implements CanActivate {
     const request = context
       .switchToHttp()
       .getRequest<{ headers: Record<string, string | string[] | undefined> }>();
-    const received = request.headers["x-admin-api-key"];
+    const received = request.headers['x-admin-api-key'];
 
-    if (!expected || received !== expected) {
-      throw new UnauthorizedException("Invalid admin API key");
+    // Reject immediately if the key is not configured
+    if (!expected) {
+      throw new UnauthorizedException('Admin API key not configured');
+    }
+
+    if (typeof received !== 'string') {
+      throw new UnauthorizedException('Invalid admin API key');
+    }
+
+    // Use constant-time comparison to prevent timing oracle attacks
+    try {
+      const expectedBuf = Buffer.from(expected);
+      const receivedBuf = Buffer.from(received);
+      if (
+        expectedBuf.length !== receivedBuf.length ||
+        !timingSafeEqual(expectedBuf, receivedBuf)
+      ) {
+        throw new UnauthorizedException('Invalid admin API key');
+      }
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      throw new UnauthorizedException('Invalid admin API key');
     }
 
     return true;
   }
 }
+

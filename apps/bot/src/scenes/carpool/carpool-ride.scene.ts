@@ -113,6 +113,12 @@ export class CarpoolRideScene {
     });
     if (!route) return;
 
+    // Ownership check: only the route owner can start a ride
+    if (route.resident.telegramId !== BigInt(ctx.from!.id)) {
+      await ctx.reply("You can only start a ride for your own carpool routes.");
+      return;
+    }
+
     // Create session
     const session = await this.prisma.rideSession.create({
       data: {

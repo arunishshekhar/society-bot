@@ -34,7 +34,8 @@ export class CarpoolPostScene {
     };
 
     if (draft.destinationAddress) {
-      await this.confirmDestination(ctx, draft.destinationAddress);
+      // Pre-fill destination from /ask intent — search directly without a Proxy
+      await this.searchDestination(ctx, draft.destinationAddress);
     } else {
       await ctx.reply("Where are you going?\nType the destination name.");
     }
@@ -47,31 +48,7 @@ export class CarpoolPostScene {
     if (!step || !text) return;
 
     if (step === "destination") {
-      const results = await this.photonService.search(text);
-      if (!results.length) {
-        await ctx.reply("No results found. Please try another name.");
-        return;
-      }
-      ctx.session.carpool!.placeResults = results;
-
-      const buttons = results.map((r, i) => [
-        Markup.button.callback(
-          `${i + 1}. ${r.name}, ${r.address}`.substring(0, 60),
-          `carpool_post:place:${i}`,
-        ),
-      ]);
-      await ctx.reply(
-        "Select your destination:",
-        Markup.inlineKeyboard([
-          ...buttons,
-          [
-            Markup.button.callback(
-              "Not listed, type again",
-              "carpool_post:retry_dest",
-            ),
-          ],
-        ]),
-      );
+      await this.searchDestination(ctx, text);
     } else if (step === "departureTime") {
       // Basic validation
       if (!text.match(/\d{1,2}:\d{2}\s*(AM|PM)/i)) {
@@ -515,15 +492,33 @@ export class CarpoolPostScene {
     await ctx.scene.enter("carpool");
   }
 
-  private async confirmDestination(ctx: BotContext, dest: string) {
-    ctx.session.carpool!.step = "destination";
-    // Emulate sending text by passing a new context proxy
-    const fakeCtx = new Proxy(ctx, {
-      get(target, prop) {
-        if (prop === "text") return dest;
-        return (target as any)[prop];
-      },
-    });
-    await this.onText(fakeCtx as any);
+  private async searchDestination(ctx: BotContext, query: string) {
+    const results = await this.photonService.search(query);
+    if (!results.length) {
+      await ctx.reply(
+        "No results found for that destination. Please type another name.",
+      );
+      return;
+    }
+    ctx.session.carpool!.placeResults = results;
+
+    const buttons = results.map((r, i) => [
+      Markup.button.callback(
+        `${i + 1}. ${r.name}, ${r.address}`.substring(0, 60),
+        `carpool_post:place:${i}`,
+      ),
+    ]);
+    await ctx.reply(
+      "Select your destination:",
+      Markup.inlineKeyboard([
+        ...buttons,
+        [
+          Markup.button.callback(
+            "Not listed, type again",
+            "carpool_post:retry_dest",
+          ),
+        ],
+      ]),
+    );
   }
 }

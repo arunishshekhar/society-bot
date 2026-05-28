@@ -15,7 +15,31 @@ const HOOK_PATH = "/telegram-webhook";
 const RETRIES = 5;
 const RETRY_DELAY_MS = 8000;
 
+/** Validate critical environment variables before the app starts */
+function validateEnv() {
+  if (!process.env.TELEGRAM_BOT_TOKEN) {
+    console.error(
+      "[bootstrap] FATAL: TELEGRAM_BOT_TOKEN is not set. Exiting.",
+    );
+    process.exit(1);
+  }
+  if (!process.env.ADMIN_API_KEY) {
+    console.warn("[bootstrap] WARNING: ADMIN_API_KEY is not set. Admin routes will reject all requests.");
+  }
+  const lat = parseFloat(process.env.SOCIETY_LAT ?? "0");
+  const lng = parseFloat(process.env.SOCIETY_LNG ?? "0");
+  if (lat === 0 || lng === 0) {
+    console.warn(
+      "[bootstrap] WARNING: SOCIETY_LAT/SOCIETY_LNG are not set (or are 0). " +
+      "Carpool routes will be calculated from 0,0 (Gulf of Guinea). " +
+      "Set these env vars to your society's coordinates.",
+    );
+  }
+}
+
 async function bootstrap() {
+  validateEnv();
+
   const webhookDomain = process.env.WEBHOOK_DOMAIN;
 
   // In polling mode: clear any stale webhook so getUpdates works.
@@ -35,7 +59,20 @@ async function bootstrap() {
   for (let attempt = 1; attempt <= RETRIES; attempt++) {
     try {
       const app = await NestFactory.create(AppModule);
-      app.enableCors();
+
+      // Restrict CORS to the dashboard origin only.
+      // Falls back to open CORS only in local development (no DASHBOARD_URL set).
+      const dashboardOrigin = process.env.DASHBOARD_URL;
+      app.enableCors(
+        dashboardOrigin
+          ? {
+              origin: dashboardOrigin,
+              methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+              allowedHeaders: ["content-type", "x-admin-api-key"],
+              credentials: false,
+            }
+          : { origin: true }, // open in dev
+      );
 
       // In webhook mode, nestjs-telegraf's bot.launch() only registers the
       // webhook URL with Telegram — it does NOT mount a route on the HTTP server.
@@ -71,3 +108,4 @@ async function bootstrap() {
 }
 
 void bootstrap();
+

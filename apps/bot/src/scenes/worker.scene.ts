@@ -235,6 +235,18 @@ export class WorkerScene {
     const id = getCallbackData(ctx)?.split(":").at(-1);
     if (!id) return;
 
+    // Ownership check: only the resident who added this recommendation may delete it
+    const resident = await this.getResident(ctx);
+    if (!resident) return;
+
+    const worker = await this.prisma.workerRecommendation.findUnique({
+      where: { id },
+    });
+    if (!worker || worker.residentId !== resident.id) {
+      await ctx.reply("You can only delete your own recommendations.");
+      return;
+    }
+
     await this.prisma.workerRecommendation.delete({ where: { id } });
     ctx.session.workers = {};
     await ctx.reply("Recommendation deleted.");

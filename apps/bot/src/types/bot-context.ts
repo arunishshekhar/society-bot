@@ -1,4 +1,6 @@
 import { Context, Scenes } from "telegraf";
+import type { PlaceResult } from "../modules/carpool/photon.service";
+import type { OrsRoute } from "../modules/carpool/ors.service";
 
 export interface BotSceneSessionData extends Scenes.SceneSessionData {}
 
@@ -110,8 +112,8 @@ export interface BotSession extends Scenes.SceneSession<BotSceneSessionData> {
       pickupLat?: number;
       pickupLng?: number;
     };
-    placeResults?: any[];
-    routeResults?: any[];
+    placeResults?: PlaceResult[];
+    routeResults?: OrsRoute[];
     selectedRouteId?: string;
     rideDirection?: string;
     rideRequests?: any[];

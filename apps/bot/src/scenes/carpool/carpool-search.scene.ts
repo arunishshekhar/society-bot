@@ -218,17 +218,28 @@ export class CarpoolSearchScene {
       },
     });
 
-    // Optimistically decrement seats
+    // Optimistically decrement seats — guard against going negative
     if (direction === "MORNING") {
-      await this.prisma.carpoolRoute.update({
-        where: { id: routeId },
+      const updated = await this.prisma.carpoolRoute.updateMany({
+        where: { id: routeId, seatsAvailable: { gt: 0 } },
         data: { seatsAvailable: { decrement: 1 } },
       });
+      if (updated.count === 0) {
+        // Race condition: seats exhausted between check and update
+        await this.prisma.carpoolRequest.delete({ where: { id: request.id } });
+        await ctx.reply("⚠️ No seats available — someone else just took the last one.");
+        return;
+      }
     } else {
-      await this.prisma.carpoolRoute.update({
-        where: { id: routeId },
+      const updated = await this.prisma.carpoolRoute.updateMany({
+        where: { id: routeId, returnSeatsAvailable: { gt: 0 } },
         data: { returnSeatsAvailable: { decrement: 1 } },
       });
+      if (updated.count === 0) {
+        await this.prisma.carpoolRequest.delete({ where: { id: request.id } });
+        await ctx.reply("⚠️ No return seats available — someone else just took the last one.");
+        return;
+      }
     }
 
     // Notify Offerer

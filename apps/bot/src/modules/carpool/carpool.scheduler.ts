@@ -16,6 +16,7 @@ export class CarpoolScheduler {
     @InjectBot() private readonly bot: Telegraf<BotContext>,
   ) {}
 
+  // Run at :00 of every minute
   @Cron(CronExpression.EVERY_MINUTE)
   async expireRideSessions() {
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
@@ -28,6 +29,9 @@ export class CarpoolScheduler {
     });
 
     for (const session of expired) {
+      // endRideSession notifies riders and marks the session COMPLETED.
+      // We then explicitly override to EXPIRED so the status reflects
+      // it was auto-expired rather than driver-ended.
       await this.carpoolService.endRideSession(session.id);
       await this.prisma.rideSession.update({
         where: { id: session.id },
@@ -37,7 +41,8 @@ export class CarpoolScheduler {
     }
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  // Run at :30 of every minute — staggered from expireRideSessions to avoid overlap
+  @Cron("30 * * * * *")
   async expirePendingRequests() {
     const expired = await this.prisma.carpoolRequest.findMany({
       where: {
@@ -71,10 +76,5 @@ export class CarpoolScheduler {
       } catch {}
     }
   }
-
-  // @Cron(CronExpression.EVERY_5_MINUTES)
-  // async detectStaleLiveLocation() {
-  //   const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
-  //   // Stale logic omitted as updatedAt is not in schema
-  // }
 }
+

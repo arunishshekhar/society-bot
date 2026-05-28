@@ -9,6 +9,7 @@ import { BotContext } from "../types/bot-context";
 import {
   isValidFlatNumber,
   isValidName,
+  isValidPhone,
   isValidVehicleNumber,
   normalizeFlatNumber,
   normalizeVehicleNumber,
@@ -78,6 +79,12 @@ export class OnboardingScene {
     }
 
     if (state.step === "phone") {
+      if (text && !isValidPhone(text)) {
+        await ctx.reply(
+          "Please enter a valid phone number (e.g. +91 98765 43210), or use the Skip button.",
+        );
+        return;
+      }
       ctx.session.onboarding = {
         ...state,
         step: "vehicle_choice",

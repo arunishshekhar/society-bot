@@ -128,7 +128,21 @@ export class CarpoolManageScene {
   async delete(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
     const id = ctx.session.carpool?.selectedRouteId;
-    if (id) await this.prisma.carpoolRoute.delete({ where: { id } });
+    if (!id) return;
+
+    // Ownership check: only the route owner may delete it
+    const resident = await this.prisma.resident.findUnique({
+      where: { telegramId: BigInt(ctx.from!.id) },
+    });
+    if (!resident) return;
+
+    const route = await this.prisma.carpoolRoute.findUnique({ where: { id } });
+    if (!route || route.residentId !== resident.id) {
+      await ctx.reply("You can only delete your own carpool routes.");
+      return;
+    }
+
+    await this.prisma.carpoolRoute.delete({ where: { id } });
     await ctx.reply("Route deleted.");
     await this.showMine(ctx);
   }
@@ -136,6 +150,22 @@ export class CarpoolManageScene {
   @Action("carpool_manage:start_ride")
   async startRide(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
+    const id = ctx.session.carpool?.selectedRouteId;
+    if (!id) return;
+
+    // Ownership check: only the route owner may start a ride on it
+    const resident = await this.prisma.resident.findUnique({
+      where: { telegramId: BigInt(ctx.from!.id) },
+    });
+    const route = resident
+      ? await this.prisma.carpoolRoute.findUnique({ where: { id } })
+      : null;
+
+    if (!route || route.residentId !== resident?.id) {
+      await ctx.reply("You can only start a ride for your own carpool routes.");
+      return;
+    }
+
     await ctx.scene.enter("carpool_ride");
   }
 
