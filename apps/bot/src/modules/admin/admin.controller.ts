@@ -231,7 +231,7 @@ export class AdminController {
 
   // ── Broadcast ──────────────────────────────────────────────
   @Post("broadcast")
-  @UseInterceptors(FileInterceptor("image"))
+  @UseInterceptors(FileInterceptor("image", { limits: { fileSize: 5 * 1024 * 1024 } }))
   async broadcast(
     @Body("message") message: string,
     @UploadedFile() file?: Express.Multer.File,

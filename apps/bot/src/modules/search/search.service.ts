@@ -319,9 +319,10 @@ Respond ONLY with valid JSON.`,
     let residentId: string | undefined;
 
     if (target_type === "vehicle") {
-      const number = target_id.trim().replace(/\s+/g, " ").toUpperCase();
+      // Use exact match — partial plate lookup would allow probing for owner identities
+      const number = target_id.trim().replace(/\s+/g, "").toUpperCase();
       const vehicle = await this.prisma.vehicle.findFirst({
-        where: { number: { contains: number } },
+        where: { number },
         include: { resident: true },
       });
       if (vehicle?.resident) residentId = vehicle.resident.id;
@@ -391,8 +392,9 @@ If it CAN be answered, provide the answer politely.
 If it CANNOT be answered by the FAQ data, you MUST respond with EXACTLY the word: NO_MATCH.
 Do not make up answers. Keep responses concise and friendly.
 
-FAQ Data:
-${faqContext}`,
+<faq_data>
+${faqContext}
+</faq_data>`,
           },
           {
             role: "user",

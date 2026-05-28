@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { validSessions } from './lib/sessions';
 
 export function proxy(req: NextRequest) {
   const session = req.cookies.get('admin-session');
-  // Validate the cookie value is a non-empty string (not forgeable with empty value)
-  const isAuthenticated = session && session.value.length > 0;
+  const isAuthenticated = session != null && validSessions.has(session.value);
   const isLogin = req.nextUrl.pathname.startsWith('/login');
 
   if (!isAuthenticated && !isLogin) {

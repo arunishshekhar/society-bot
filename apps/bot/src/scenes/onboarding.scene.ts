@@ -359,7 +359,8 @@ export class OnboardingScene {
         name: state.name,
         flatNumber: state.flatNumber,
         phone: state.phone,
-        isActive: true,
+        // Do NOT set isActive here — an admin may have disabled this account.
+        // isActive is only set to true on the create path (default).
         onboardingComplete: true,
       },
     });

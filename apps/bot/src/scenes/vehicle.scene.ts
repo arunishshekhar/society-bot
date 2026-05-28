@@ -119,6 +119,14 @@ export class VehicleScene {
     const id = getCallbackData(ctx)?.split(":").at(-1);
     if (!id) return;
 
+    // Ownership check — only the vehicle owner may delete it
+    const resident = await this.getResident(ctx);
+    const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
+    if (!vehicle || !resident || vehicle.residentId !== resident.id) {
+      await ctx.reply("You can only delete your own vehicles.");
+      return;
+    }
+
     await this.prisma.vehicle.delete({ where: { id } });
     ctx.session.vehicles = {};
     await ctx.reply("Vehicle deleted.");
@@ -181,6 +189,14 @@ export class VehicleScene {
       }
 
       if (state.mode === "editing" && state.selectedId) {
+        // Ownership check
+        const residentForEdit = await this.getResident(ctx);
+        const vehicleForEdit = await this.prisma.vehicle.findUnique({ where: { id: state.selectedId } });
+        if (!residentForEdit || !vehicleForEdit || vehicleForEdit.residentId !== residentForEdit.id) {
+          await ctx.reply("You can only edit your own vehicles.");
+          await this.showVehicleList(ctx);
+          return;
+        }
         await this.prisma.vehicle.update({
           where: { id: state.selectedId },
           data: { number },
@@ -201,6 +217,20 @@ export class VehicleScene {
     }
 
     if (state.mode === "editing" && state.selectedId) {
+      // Ownership check
+      const residentEdit = await this.getResident(ctx);
+      const vehicleEdit = await this.prisma.vehicle.findUnique({ where: { id: state.selectedId } });
+      if (!residentEdit || !vehicleEdit || vehicleEdit.residentId !== residentEdit.id) {
+        await ctx.reply("You can only edit your own vehicles.");
+        await this.showVehicleList(ctx);
+        return;
+      }
+      // Whitelist the field name — isEditableField is already validated in the action handler
+      // but we re-check here as defence-in-depth against session tampering.
+      if (!this.isEditableField(state.step)) {
+        await this.showVehicleList(ctx);
+        return;
+      }
       await this.prisma.vehicle.update({
         where: { id: state.selectedId },
         data: { [state.step]: text },

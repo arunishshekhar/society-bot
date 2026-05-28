@@ -86,10 +86,13 @@ export class CarpoolService {
       data: { status: "DECLINED", resolvedAt: new Date() },
     });
 
-    // Restore seat
+    // Restore the seat in the correct direction field
     await this.prisma.carpoolRoute.update({
       where: { id: request.routeId },
-      data: { seatsAvailable: { increment: 1 } },
+      data:
+        request.direction === "MORNING"
+          ? { seatsAvailable: { increment: 1 } }
+          : { returnSeatsAvailable: { increment: 1 } },
     });
 
     try {

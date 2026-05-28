@@ -8,7 +8,9 @@ export function normalizeFlatNumber(value: string) {
 }
 
 export function isValidFlatNumber(value: string) {
-  return /^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)+$/.test(value.trim());
+  // Exactly 3 hyphen-separated alphanumeric segments: Tower-Floor-Unit
+  // e.g. 03-12-03, A-12-03, B2-11-04
+  return /^[a-zA-Z0-9]{1,6}-[a-zA-Z0-9]{1,4}-[a-zA-Z0-9]{1,4}$/.test(value.trim());
 }
 
 export function normalizeVehicleNumber(value: string) {

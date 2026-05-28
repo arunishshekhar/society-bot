@@ -528,7 +528,23 @@ export class CarpoolPostScene {
   @Action("carpool_post:save")
   async saveRoute(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
-    const draft = ctx.session.carpool!.postDraft!;
+
+    // Guard against stale sessions / double-taps
+    const draft = ctx.session.carpool?.postDraft;
+    if (
+      !draft?.startLat ||
+      !draft?.destinationLat ||
+      !draft?.departureTime ||
+      !draft?.type ||
+      !draft?.morningPolyline ||
+      !draft?.morningDistanceKm ||
+      !draft?.morningDurationMin ||
+      !draft?.seatsAvailable
+    ) {
+      await ctx.reply("❌ Route data is incomplete or your session expired. Please start again.");
+      return ctx.scene.enter("carpool");
+    }
+
     const resident = await this.prisma.resident.findUnique({
       where: { telegramId: BigInt(ctx.from!.id) },
     });

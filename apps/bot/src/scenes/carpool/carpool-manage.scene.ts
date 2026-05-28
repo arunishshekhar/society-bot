@@ -122,6 +122,16 @@ export class CarpoolManageScene {
     if (!id) return;
     const route = await this.prisma.carpoolRoute.findUnique({ where: { id } });
     if (!route) return;
+
+    // Ownership check
+    const resident = await this.prisma.resident.findUnique({
+      where: { telegramId: BigInt(ctx.from!.id) },
+    });
+    if (!resident || route.residentId !== resident.id) {
+      await ctx.reply("You can only pause/resume your own carpool routes.");
+      return;
+    }
+
     await this.prisma.carpoolRoute.update({
       where: { id },
       data: { isPaused: !route.isPaused },

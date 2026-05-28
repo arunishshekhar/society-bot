@@ -64,25 +64,37 @@ export class AdminService {
     });
   }
 
-  createWorker(data: {
+  async createWorker(data: {
     name: string;
     phone: string;
     category: string;
     notes?: string | null;
   }) {
-    const workerCode = Array.from({ length: 3 }, () =>
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 36)]
-    ).join("");
-    return this.prisma.workerRecommendation.create({
-      data: {
-        workerCode,
-        name: data.name,
-        phone: data.phone,
-        category: data.category,
-        tags: [data.category],
-        notes: data.notes ?? null,
-      },
-    });
+    // Retry until we find a unique 4-char alphanumeric code.
+    // 36^4 = 1,679,616 possibilities — essentially never exhausts for typical use.
+    const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const workerCode = Array.from(
+        { length: 4 },
+        () => charset[Math.floor(Math.random() * charset.length)],
+      ).join("");
+      try {
+        return await this.prisma.workerRecommendation.create({
+          data: {
+            workerCode,
+            name: data.name,
+            phone: data.phone,
+            category: data.category,
+            tags: [data.category],
+            notes: data.notes ?? null,
+          },
+        });
+      } catch (err: any) {
+        // P2002 = Unique constraint violation — try a different code
+        if (err?.code !== "P2002") throw err;
+      }
+    }
+    throw new Error("Could not generate a unique worker code after 10 attempts.");
   }
 
   updateWorker(

@@ -232,14 +232,21 @@ export class WorkerScene {
     if (!category || !state?.mode) return;
 
     if (state.mode === "editing" && state.selectedId) {
-      const worker = await this.prisma.workerRecommendation.findUnique({
+      // Ownership check
+      const resident = await this.getResident(ctx);
+      const existingWorker = await this.prisma.workerRecommendation.findUnique({
         where: { id: state.selectedId },
       });
+      if (!resident || !existingWorker || existingWorker.residentId !== resident.id) {
+        await ctx.reply("You can only edit your own recommendations.");
+        await this.showMyRecommendations(ctx);
+        return;
+      }
       await this.prisma.workerRecommendation.update({
         where: { id: state.selectedId },
         data: {
           category,
-          tags: deriveWorkerTags(category, worker?.notes),
+          tags: deriveWorkerTags(category, existingWorker.notes),
         },
       });
       await ctx.reply("Recommendation updated.");
@@ -349,12 +356,23 @@ export class WorkerScene {
         return;
       }
 
+      // Ownership check — only the recommender may edit their own entry
+      const resident = await this.getResident(ctx);
+      const workerForEdit = await this.prisma.workerRecommendation.findUnique({
+        where: { id: state.selectedId },
+      });
+      if (!resident || !workerForEdit || workerForEdit.residentId !== resident.id) {
+        await ctx.reply("You can only edit your own recommendations.");
+        await this.showMyRecommendations(ctx);
+        return;
+      }
+
       const data =
         state.editField === "notes"
           ? {
               notes: text,
               tags: deriveWorkerTags(
-                (await this.getWorkerCategory(state.selectedId)) ?? "",
+                workerForEdit.category,
                 text,
               ),
             }
