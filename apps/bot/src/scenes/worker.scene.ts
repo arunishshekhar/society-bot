@@ -101,7 +101,7 @@ export class WorkerScene {
     await ctx.reply(
       [
         `*${worker.name}* [${worker.workerCode}]`,
-        `Phone: [${worker.phone}](tel:${worker.phone.replace(/[^0-9+]/g, '')})`,
+        `Phone: ${worker.phone.startsWith('+') ? worker.phone : '+91' + worker.phone}`,
         `Added by: ${worker.resident?.flatNumber ?? "Admin"}`,
       ].join("\n"),
       { parse_mode: "Markdown" }
@@ -608,7 +608,7 @@ export class WorkerScene {
       [
         `👷 *${worker.name}* [${worker.workerCode}]`,
         `Category: ${this.title(worker.category)}`,
-        `📞 Phone: [${worker.phone}](tel:${worker.phone.replace(/[^0-9+]/g, '')})`,
+        `📞 Phone: ${worker.phone.startsWith('+') ? worker.phone : '+91' + worker.phone}`,
         `⭐ Rating: ${this.ratingService.formatRating(worker.avgRating, ratingCount)}`,
         `📝 Notes: ${worker.notes ?? "None"}`,
       ].join("\n"),

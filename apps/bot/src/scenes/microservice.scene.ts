@@ -242,7 +242,7 @@ export class MicroServiceScene {
     const metadata = readServiceMetadata(service.metadata);
     const contact =
       metadata.contactPreference === "phone"
-        ? (service.resident?.phone ? `[${service.resident.phone}](tel:${service.resident.phone.replace(/[^0-9+]/g, '')})` : "Phone not available")
+        ? (service.resident?.phone ? (service.resident.phone.startsWith('+') ? service.resident.phone : '+91' + service.resident.phone) : "Phone not available")
         : service.resident?.telegramUsername
           ? `@${service.resident.telegramUsername}`
           : service.resident
