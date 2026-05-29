@@ -5,6 +5,9 @@ export async function proxy(req: NextRequest) {
   const session = req.cookies.get('admin-session');
   const isLogin = req.nextUrl.pathname.startsWith('/login');
 
+  console.log('proxy.ts: session =', session?.value);
+  console.log('proxy.ts: ADMIN_PASSWORD =', process.env.ADMIN_PASSWORD);
+
   // Stateless HMAC verification — works in Edge Runtime without shared state
   const isAuthenticated =
     session != null && (await verifySessionToken(session.value));

@@ -20,19 +20,23 @@ export async function POST(req: NextRequest) {
   }
 
   if (!valid) {
-    return NextResponse.redirect(new URL('/login?error=1', req.url));
+    return new Response(null, {
+      status: 303,
+      headers: { Location: new URL('/login?error=1', req.url).toString() },
+    });
   }
 
   // Create a stateless HMAC-signed token — works across Edge and Node.js runtimes.
   const sessionToken = await createSessionToken();
 
-  const response = NextResponse.redirect(new URL('/', req.url));
-  response.cookies.set('admin-session', sessionToken, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 60 * 60 * 8, // 8 hours
+  const response = new Response(null, {
+    status: 303,
+    headers: { Location: new URL('/', req.url).toString() },
   });
+  
+  // Need to set cookie manually on standard Response
+  const cookieHeader = `admin-session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 8}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`;
+  response.headers.set('Set-Cookie', cookieHeader);
+  
   return response;
 }
