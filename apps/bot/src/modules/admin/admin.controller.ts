@@ -237,6 +237,44 @@ export class AdminController {
     this.logger.log("GET /admin/broadcast");
     return this.admin.broadcasts();
   }
+  @Post("ping-unregistered")
+  async pingUnregistered() {
+    this.logger.log("POST /admin/ping-unregistered");
+    const groupId = process.env.TELEGRAM_GROUP_ID;
+    if (!groupId) {
+      throw new Error("TELEGRAM_GROUP_ID is not configured");
+    }
+
+    const unregistered = await this.admin.unregisteredResidents();
+    const mentions: string[] = [];
+    const chatId = /^-?\d+$/.test(groupId) ? Number(groupId) : groupId;
+
+    for (const resident of unregistered) {
+      try {
+        // Only ping if they are actually in the group
+        const member = await this.bot.telegram.getChatMember(chatId, Number(resident.telegramId));
+        if (member.status === "member" || member.status === "restricted" || member.status === "creator" || member.status === "administrator") {
+          const name = resident.name || "Resident";
+          mentions.push(`[${name}](tg://user?id=${resident.telegramId})`);
+        }
+      } catch {
+        // Skip if bot doesn't have permission or user not in group
+      }
+    }
+
+    if (mentions.length === 0) {
+      return { recipientCount: 0 };
+    }
+
+    const message = `👋 Welcome to the Society!\n\nWe noticed some of you haven't completed your registration with the Society Bot yet.\n\nPlease start a private chat with @${this.bot.botInfo?.username} and send /start to complete your registration and access all society services!\n\n${mentions.join(", ")}`;
+
+    await this.bot.telegram.sendMessage(chatId, message, { parse_mode: "Markdown" });
+    
+    // Log it as a broadcast
+    await this.admin.logBroadcast("Pinged unregistered members", "dashboard", mentions.length);
+
+    return { recipientCount: mentions.length };
+  }
 
   @Post("broadcast")
   @UseInterceptors(FileInterceptor("image", { limits: { fileSize: 5 * 1024 * 1024 } }))

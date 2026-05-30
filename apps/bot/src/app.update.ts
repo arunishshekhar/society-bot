@@ -264,18 +264,25 @@ export class AppUpdate {
 
   @On("new_chat_members")
   async onNewChatMembers(@Ctx() ctx: BotContext) {
+    this.logger.log(`Received new_chat_members event! chat=${ctx.chat?.id}`);
     const newMembers = (ctx.message as any)?.new_chat_members;
-    if (!newMembers) return;
+    if (!newMembers) {
+      this.logger.warn(`No newMembers found in ctx.message! keys: ${Object.keys(ctx.message || {}).join(',')}`);
+      return;
+    }
     
     for (const member of newMembers) {
       if (member.is_bot) continue;
       
       const name = member.first_name || "Resident";
+      this.logger.log(`Welcoming ${name} (${member.id})`);
       await ctx.reply(
         `Hi ${name}, welcome to the community! 👋\n\n` +
         `I am the Society Bot. Please start a private chat with me (@${ctx.botInfo.username}) to access all society services.`,
         { disable_notification: true }
-      ).catch(() => {});
+      ).catch((err) => {
+        this.logger.error(`Failed to send welcome message: ${err.message}`);
+      });
     }
   }
 

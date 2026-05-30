@@ -13,8 +13,11 @@ export function createPrivateChatOnlyMiddleware(prisma: PrismaService) {
     const chatType = ctx.chat?.type;
 
     if (chatType && chatType !== "private") {
+      logger.log(`Received group update: keys=${Object.keys(ctx.update).join(',')} message_keys=${ctx.message ? Object.keys(ctx.message).join(',') : 'none'}`);
+      
       // Allow new_chat_members events so we can send a welcome message in the group
       if (ctx.message && "new_chat_members" in ctx.message) {
+        logger.log("Allowing new_chat_members event");
         return await next();
       }
 
