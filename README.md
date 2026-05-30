@@ -360,6 +360,22 @@ Accessible at your Vercel URL. Protected by `ADMIN_PASSWORD` (HMAC-signed sessio
 
 ---
 
-## License
+## License & Usage Terms
 
-Private — for internal society use only.
+This project is private and intended strictly for internal use within the society/community.
+
+### Restrictions
+- Commercial use is strictly prohibited.
+- Redistribution, resale, or sublicensing is not allowed.
+- Unauthorized copying or public hosting of the source code is prohibited.
+- Modification of the project for external/commercial deployment is not permitted without explicit permission.
+- Access should be limited to approved society members and administrators only.
+- Any misuse, abuse, or attempt to exploit the platform, data, or services is strictly prohibited.
+- User data collected through the platform must remain confidential and must not be shared with third parties.
+- Reverse engineering, automated scraping, or security testing without authorization is prohibited.
+
+### Ownership
+All rights, code, assets, branding, configurations, and related materials belong to the project owner/maintainers unless stated otherwise.
+
+### Disclaimer
+This software is provided “as is” without warranties of any kind. The maintainers are not responsible for any data loss, misuse, downtime, or damages resulting from usage of the platform.
