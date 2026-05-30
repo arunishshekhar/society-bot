@@ -251,7 +251,7 @@ export class AdminController {
     const residents = await this.admin.activeResidents();
     this.logger.log(`Broadcast target: ${residents.length} active residents`);
 
-    const imageBuffer = file?.buffer ?? null;
+    const imageBuffer = file && file.size > 0 ? file.buffer : null;
 
     let sent = 0;
     let useMarkdown = true;
@@ -291,6 +291,7 @@ export class AdminController {
           sent += 1;
         }
       } catch (error: any) {
+        this.logger.error(`Broadcast failed for ${resident.telegramId}: ${error.message || error}`);
         if (useMarkdown && error.response?.description?.includes("can't parse entities")) {
           useMarkdown = false;
           try {
@@ -307,8 +308,8 @@ export class AdminController {
               );
             }
             sent += 1;
-          } catch {
-            // Ignore fallback failure
+          } catch (fallbackError: any) {
+            this.logger.error(`Fallback failed for ${resident.telegramId}: ${fallbackError.message || fallbackError}`);
           }
         }
         // Keep broadcasting to remaining residents.
