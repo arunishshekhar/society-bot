@@ -53,6 +53,12 @@ export class LostFoundService {
     const matches = await this.searchService.findMatchingLostReports(foundItem.aiDescription, foundItem.id);
 
     for (const lostReport of matches) {
+      // Avoid duplicate match records and notifications (same pattern as scanAndNotifyFoundItems)
+      const alreadyMatched = await this.prisma.lostFoundMatch.findUnique({
+        where: { foundItemId_lostItemId: { foundItemId: foundItem.id, lostItemId: lostReport.id } },
+      });
+      if (alreadyMatched) continue;
+
       // Record match
       await this.prisma.lostFoundMatch.create({
         data: {

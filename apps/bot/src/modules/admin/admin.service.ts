@@ -319,10 +319,13 @@ export class AdminService {
 
   // ── Lost & Found ───────────────────────────────────────────
   foundItems(status?: string) {
+    const VALID_STATUSES = ['OPEN', 'RESOLVED'] as const;
+    type LFStatus = typeof VALID_STATUSES[number];
+    const validStatus = VALID_STATUSES.includes(status as LFStatus) ? (status as LFStatus) : undefined;
     return this.prisma.foundItem.findMany({
-      where: status ? { status: status as any } : undefined,
+      where: validStatus ? { status: validStatus } : undefined,
       include: { reportedBy: { select: { name: true, flatNumber: true } } },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -359,10 +362,13 @@ export class AdminService {
   }
 
   lostItems(status?: string) {
+    const VALID_STATUSES = ['OPEN', 'RESOLVED'] as const;
+    type LFStatus = typeof VALID_STATUSES[number];
+    const validStatus = VALID_STATUSES.includes(status as LFStatus) ? (status as LFStatus) : undefined;
     return this.prisma.lostItem.findMany({
-      where: status ? { status: status as any } : undefined,
+      where: validStatus ? { status: validStatus } : undefined,
       include: { reportedBy: { select: { name: true, flatNumber: true } } },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
     });
   }
 

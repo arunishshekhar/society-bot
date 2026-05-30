@@ -5,6 +5,7 @@ import { PrismaService } from "./prisma/prisma.service";
 import { SearchService } from "./modules/search/search.service";
 import { BotContext } from "./types/bot-context";
 import { CarpoolService } from "./modules/carpool/carpool.service";
+import { LostFoundService } from "./modules/lost-found/lost-found.service";
 
 @Update()
 export class AppUpdate {
@@ -14,6 +15,7 @@ export class AppUpdate {
     private readonly prisma: PrismaService,
     private readonly searchService: SearchService,
     private readonly carpoolService: CarpoolService,
+    private readonly lostFoundService: LostFoundService,
   ) {}
 
   @Start()
@@ -168,9 +170,20 @@ export class AppUpdate {
     const match = ctx.match as RegExpMatchArray;
     const foundItemId = match[1];
     const lostItemId = match[2];
-    
-    // Lost person claims found item -> enter manage scene to show collection details
-    await this.enterScene(ctx, "lost_found_manage");
+
+    // Resolve both items in DB and notify the finder
+    const resident = await this.prisma.resident.findUnique({
+      where: { telegramId: BigInt(ctx.from!.id) },
+    });
+    if (resident) {
+      try {
+        await this.lostFoundService.resolveItems(foundItemId, lostItemId, resident.id);
+      } catch (err) {
+        this.logger.error('lfClaim resolveItems failed:', err);
+      }
+    }
+
+    await this.enterScene(ctx, 'lost_found_manage');
   }
 
 
@@ -278,7 +291,7 @@ export class AppUpdate {
       this.logger.log(`Welcoming ${name} (${member.id})`);
       await ctx.reply(
         `Hi ${name}, welcome to the community! 👋\n\n` +
-        `I am the Society Bot. Please start a private chat with me (@${ctx.botInfo.username}) to access all society services.`,
+        `I am the Society Bot. Please start a private chat with me (@${ctx.botInfo?.username ?? 'the Society Bot'}) to access all society services.`,
         { disable_notification: true }
       ).catch((err) => {
         this.logger.error(`Failed to send welcome message: ${err.message}`);

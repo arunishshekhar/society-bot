@@ -249,12 +249,15 @@ export class AdminController {
     const mentions: string[] = [];
     const chatId = /^-?\d+$/.test(groupId) ? Number(groupId) : groupId;
 
+    const escapeMarkdown = (s: string) =>
+      s.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+
     for (const resident of unregistered) {
       try {
         // Only ping if they are actually in the group
         const member = await this.bot.telegram.getChatMember(chatId, Number(resident.telegramId));
         if (member.status === "member" || member.status === "restricted" || member.status === "creator" || member.status === "administrator") {
-          const name = resident.name || "Resident";
+          const name = escapeMarkdown(resident.name || "Resident");
           mentions.push(`[${name}](tg://user?id=${resident.telegramId})`);
         }
       } catch {
@@ -266,7 +269,8 @@ export class AdminController {
       return { recipientCount: 0 };
     }
 
-    const message = `👋 Welcome to the Society!\n\nWe noticed some of you haven't completed your registration with the Society Bot yet.\n\nPlease start a private chat with @${this.bot.botInfo?.username} and send /start to complete your registration and access all society services!\n\n${mentions.join(", ")}`;
+    const botUsername = this.bot.botInfo?.username ?? 'the Society Bot';
+    const message = `👋 Welcome to the Society!\n\nWe noticed some of you haven't completed your registration with the Society Bot yet.\n\nPlease start a private chat with @${botUsername} and send /start to complete your registration and access all society services!\n\n${mentions.join(", ")}`;
 
     await this.bot.telegram.sendMessage(chatId, message, { parse_mode: "Markdown" });
     
@@ -449,7 +453,7 @@ export class AdminController {
     const foundItems = await this.admin.foundItems("OPEN");
     let notified = 0;
     for (const item of foundItems) {
-      await this.lostFound.scanAndNotifyLostReporters(item as any);
+      await this.lostFound.scanAndNotifyLostReporters(item);
       notified++;
     }
     // Also scan in reverse: each open lost item against all open found items.

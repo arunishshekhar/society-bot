@@ -147,7 +147,14 @@ export class CarpoolRideScene {
       },
     });
 
-    for (const req of requests) {
+    // Re-query accepted requests fresh from the DB — session data may be stale
+    // if the user waited before pressing Confirm Start.
+    const freshRequests = await this.prisma.carpoolRequest.findMany({
+      where: { routeId, direction, status: "ACCEPTED" },
+      include: { seeker: true },
+    });
+
+    for (const req of freshRequests) {
       try {
         let text = `🚗 *Your ride has started!*\n\n*${route.resident.name}* · Flat ${route.resident.flatNumber} has begun the trip.\n\n`;
         text += `*Also in this ride:*\n`;

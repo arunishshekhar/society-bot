@@ -392,6 +392,13 @@ export class WorkerScene {
     }
 
     if (state.mode === "editing" && state.selectedId && state.editField) {
+      // Defence-in-depth whitelist — prevents session tampering from overwriting
+      // protected fields like isActive or isBanned.
+      if (!this.isEditField(state.editField)) {
+        await this.showMyRecommendations(ctx);
+        return;
+      }
+
       if (state.editField === "phone" && !isValidPhone(text)) {
         await ctx.reply("Please enter a valid phone number.");
         return;

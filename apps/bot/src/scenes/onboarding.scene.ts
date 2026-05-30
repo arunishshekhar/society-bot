@@ -366,24 +366,35 @@ export class OnboardingScene {
     });
 
     if (state.vehicle?.number && state.vehicle.type && state.vehicle.color) {
-      await this.prisma.vehicle.upsert({
+      // Check if this plate already belongs to a different resident
+      const existingVehicle = await this.prisma.vehicle.findUnique({
         where: { number: state.vehicle.number },
-        create: {
-          residentId: resident.id,
-          number: state.vehicle.number,
-          type: state.vehicle.type,
-          color: state.vehicle.color,
-          model: state.vehicle.model,
-          parkingSlot: state.vehicle.parkingSlot,
-        },
-        update: {
-          residentId: resident.id,
-          type: state.vehicle.type,
-          color: state.vehicle.color,
-          model: state.vehicle.model,
-          parkingSlot: state.vehicle.parkingSlot,
-        },
       });
+      if (existingVehicle && existingVehicle.residentId !== resident.id) {
+        // Another resident owns this plate — refuse silently to prevent hijacking
+        await ctx.reply(
+          '⚠️ That vehicle number is already registered to another account. If this is your vehicle, please contact the society admin.',
+        );
+      } else {
+        await this.prisma.vehicle.upsert({
+          where: { number: state.vehicle.number },
+          create: {
+            residentId: resident.id,
+            number: state.vehicle.number,
+            type: state.vehicle.type,
+            color: state.vehicle.color,
+            model: state.vehicle.model,
+            parkingSlot: state.vehicle.parkingSlot,
+          },
+          update: {
+            residentId: resident.id,
+            type: state.vehicle.type,
+            color: state.vehicle.color,
+            model: state.vehicle.model,
+            parkingSlot: state.vehicle.parkingSlot,
+          },
+        });
+      }
     }
 
     ctx.session.onboarding = undefined;

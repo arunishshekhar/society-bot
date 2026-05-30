@@ -107,6 +107,13 @@ export class ProfileScene {
       return;
     }
 
+    // Whitelist defence — prevent session tampering from writing isActive etc.
+    const EDITABLE: Array<"name" | "flatNumber" | "phone"> = ["name", "flatNumber", "phone"];
+    if (!EDITABLE.includes(field as any)) {
+      await this.showProfile(ctx);
+      return;
+    }
+
     await this.updateResident(ctx, {
       [field]: field === "flatNumber" ? normalizeFlatNumber(text) : text,
     });

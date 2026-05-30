@@ -79,7 +79,8 @@ export class CarpoolManageScene {
     const id = match?.[1];
     if (!id) return;
 
-    ctx.session.carpool!.selectedRouteId = id;
+    if (!ctx.session.carpool) ctx.session.carpool = {};
+    ctx.session.carpool.selectedRouteId = id;
     await this.showRouteDetail(ctx, id);
   }
 

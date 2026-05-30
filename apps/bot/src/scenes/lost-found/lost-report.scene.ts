@@ -39,7 +39,7 @@ export class LostReportScene {
 
       // Save report
       const resident = await this.prisma.resident.findUnique({
-        where: { telegramId: ctx.from!.id },
+        where: { telegramId: BigInt(ctx.from!.id) },
       });
 
       if (!resident) {

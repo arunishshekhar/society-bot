@@ -68,12 +68,16 @@ export class FoundReportScene {
 
         // DB save
         const resident = await this.prisma.resident.findUnique({
-          where: { telegramId: ctx.from!.id },
+          where: { telegramId: BigInt(ctx.from!.id) },
         });
 
-        if (resident) {
-          await this.lostFoundService.saveFoundItem(ctx.session.foundItem, resident.id);
+        if (!resident) {
+          await ctx.reply('Error: your account was not found. Please /start again.');
+          await ctx.scene.leave();
+          return;
         }
+
+        await this.lostFoundService.saveFoundItem(ctx.session.foundItem!, resident.id);
 
         await ctx.telegram.deleteMessage(ctx.chat!.id, waitMsg.message_id);
 

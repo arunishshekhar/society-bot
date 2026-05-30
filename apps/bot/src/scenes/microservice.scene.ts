@@ -297,6 +297,13 @@ export class MicroServiceScene {
     }
 
     if (state.mode === "editing" && state.editField) {
+      // Defence-in-depth whitelist — prevents session tampering from overwriting
+      // protected fields like isPaused or isDisabled.
+      if (!this.isEditField(state.editField)) {
+        await this.showMine(ctx);
+        return;
+      }
+
       if (state.editField === "timing") {
         const current = await this.getOwnService(ctx);
         const preference = current
