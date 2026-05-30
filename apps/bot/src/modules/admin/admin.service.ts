@@ -299,6 +299,12 @@ export class AdminService {
     });
   }
 
+  unregisteredResidents() {
+    return this.prisma.resident.findMany({
+      where: { isActive: true, onboardingComplete: false },
+    });
+  }
+
   logBroadcast(message: string, sentBy: string, recipientCount: number) {
     return this.prisma.broadcast.create({
       data: { message, sentBy, recipientCount },

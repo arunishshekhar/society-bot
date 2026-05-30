@@ -10,8 +10,8 @@ import React from 'react';
 
 export const dynamic = 'force-dynamic';
 
-export default async function BroadcastPage({ searchParams }: { searchParams: Promise<{ sent?: string; error?: string }> }) {
-  const { sent, error } = await searchParams;
+export default async function BroadcastPage({ searchParams }: { searchParams: Promise<{ sent?: string; pinged?: string; error?: string }> }) {
+  const { sent, pinged, error } = await searchParams;
   const broadcasts = await adminFetch<AdminRecord[]>('/admin/broadcast') ?? [];
 
   return (
@@ -59,6 +59,37 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
             )}
             
             <SubmitButton className="w-full">Send Broadcast</SubmitButton>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="mx-auto max-w-2xl mb-8 border-amber-200 dark:border-amber-900/50">
+        <CardHeader className="bg-amber-50 dark:bg-amber-950/20 rounded-t-lg">
+          <CardTitle className="text-xl text-amber-800 dark:text-amber-400">Group Actions</CardTitle>
+          <CardDescription className="text-amber-700/80 dark:text-amber-400/80">
+            Tag users in the group who have not completed their bot registration.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <form action={async () => {
+            'use server';
+            const { pingUnregisteredAction } = await import('../actions/admin');
+            await pingUnregisteredAction();
+          }}>
+            <p className="text-sm text-muted-foreground mb-4">
+              This action will scan the bot's database for users who haven't completed onboarding, check if they are currently members of the society group, and send a single message tagging all of them with instructions to start the bot.
+            </p>
+            {pinged && (
+              <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mb-4">
+                Success! Pinged {pinged} unregistered residents in the group.
+              </p>
+            )}
+            {error === 'ping' && (
+              <p className="text-sm font-medium text-destructive mb-4">
+                Failed to send ping. Make sure the bot is an admin in the group.
+              </p>
+            )}
+            <SubmitButton className="w-full sm:w-auto" variant="secondary">Ping Unregistered Members</SubmitButton>
           </form>
         </CardContent>
       </Card>

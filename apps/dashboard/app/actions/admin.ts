@@ -188,6 +188,33 @@ export async function broadcastAction(formData: FormData) {
   }
 }
 
+export async function pingUnregisteredAction() {
+  let success = false;
+  let sentCount = 0;
+  
+  try {
+    const res = await fetch(`${api}/admin/ping-unregistered`, {
+      method: 'POST',
+      headers: { 'x-admin-api-key': key },
+      cache: 'no-store',
+    });
+
+    if (res.ok) {
+      success = true;
+      const result = (await res.json()) as { recipientCount?: number };
+      sentCount = result.recipientCount ?? 0;
+    }
+  } catch {
+    success = false;
+  }
+  
+  if (success) {
+    redirect(`/broadcast?pinged=${sentCount}`);
+  } else {
+    redirect('/broadcast?error=ping');
+  }
+}
+
 // ── Lost & Found ───────────────────────────────────────────
 export async function resolveFoundItemAction(formData: FormData) {
   const id = String(formData.get('id'));
