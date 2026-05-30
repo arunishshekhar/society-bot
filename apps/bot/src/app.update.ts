@@ -222,8 +222,8 @@ export class AppUpdate {
     }
   }
 
-  @On("message")
-  async onMessage(@Ctx() ctx: BotContext) {
+  @On("location")
+  async onLocation(@Ctx() ctx: BotContext) {
     if (!(await this.ensureActiveOnboardedResident(ctx))) return;
     const message = ctx.message as any;
     if (message?.location) {
