@@ -12,9 +12,6 @@ import { mainMenuKeyboard } from "../../keyboards/main-menu.keyboard";
 @Scene("carpool_ride")
 @UseGuards(GroupMemberGuard)
 export class CarpoolRideScene {
-  private readonly societyLat = parseFloat(process.env.SOCIETY_LAT ?? "0");
-  private readonly societyLng = parseFloat(process.env.SOCIETY_LNG ?? "0");
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly carpoolService: CarpoolService,
@@ -122,7 +119,6 @@ export class CarpoolRideScene {
     await ctx.answerCbQuery();
     const routeId = ctx.session.carpool?.selectedRouteId;
     const direction = ctx.session.carpool?.rideDirection as Direction;
-    const requests = ctx.session.carpool?.rideRequests ?? [];
     if (!routeId) return;
 
     const route = await this.prisma.carpoolRoute.findUnique({
@@ -148,31 +144,37 @@ export class CarpoolRideScene {
     });
 
     // Re-query accepted requests fresh from the DB — session data may be stale
-    // if the user waited before pressing Confirm Start.
     const freshRequests = await this.prisma.carpoolRequest.findMany({
       where: { routeId, direction, status: "ACCEPTED" },
       include: { seeker: true },
     });
 
+    /**
+     * Fix #13: The previous implementation tried to send a bot-initiated live
+     * location, which is not possible via the Bot API — only real users can
+     * send live locations. Instead we:
+     *   1. Tell riders the ride has started and give them the driver's contact
+     *      so they can request a live location share directly via Telegram DMs.
+     *   2. Still record the session so the driver's own location updates (sent
+     *      manually to the bot) are forwarded via app.update.ts @On('location').
+     */
     for (const req of freshRequests) {
       try {
         let text = `🚗 *Your ride has started!*\n\n*${route.resident.name}* · Flat ${route.resident.flatNumber} has begun the trip.\n\n`;
         text += `*Also in this ride:*\n`;
-        requests.forEach((r) => {
-          text += `• ${r.seeker.flatNumber} · ${r.seeker.name}\n`;
+        freshRequests.forEach((r) => {
+          if (r.id !== req.id) {
+            text += `• ${r.seeker.flatNumber} · ${r.seeker.name}\n`;
+          }
         });
-        text += `\n📍 Live location will appear below. Track in real time as they approach.`;
+        text += `\n📱 *Driver contact:*\n`;
+        text += `${route.resident.phone ? `📞 ${route.resident.phone}\n` : ""}`;
+        text += `${route.resident.telegramUsername ? `@${route.resident.telegramUsername}\n` : ""}`;
+        text += `\n💡 Ask your driver to share their Live Location with you directly in Telegram for real-time tracking.`;
 
         await ctx.telegram.sendMessage(req.seeker.telegramId.toString(), text, {
           parse_mode: "Markdown",
         });
-
-        const msg = await ctx.telegram.sendLocation(
-          req.seeker.telegramId.toString(),
-          direction === "MORNING" ? this.societyLat : route.destinationLat,
-          direction === "MORNING" ? this.societyLng : route.destinationLng,
-          { live_period: 7200 },
-        );
 
         await this.prisma.rideSessionMember.create({
           data: {
@@ -180,22 +182,31 @@ export class CarpoolRideScene {
             riderTelegramId: req.seeker.telegramId,
             riderName: req.seeker.name,
             riderFlat: req.seeker.flatNumber,
-            locationMessageId: msg.message_id,
+            // Fix #13: No bot-sent live location message to track — use 0 as placeholder
+            locationMessageId: 0,
           },
         });
       } catch {}
     }
 
     await ctx.reply(
-      "✅ Ride started! Riders notified.\n\n📍 Please share your Live Location with me so your riders can track you in real time.\n\nIn Telegram:\n📎 → Location → Share Live Location → 1 hour",
-      Markup.inlineKeyboard([
-        [
-          Markup.button.callback(
-            "🏁 End Ride",
-            `carpool_ride:end:${session.id}`,
-          ),
-        ],
-      ]),
+      `✅ Ride started! ${freshRequests.length} rider(s) notified.\n\n` +
+        `📍 *Share your live location with riders:*\n` +
+        `In Telegram: 📎 → Location → Share Live Location → choose duration\n\n` +
+        `The bot will automatically forward your location updates to all riders.`,
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              Markup.button.callback(
+                "🏁 End Ride",
+                `carpool_ride:end:${session.id}`,
+              ),
+            ],
+          ],
+        },
+      },
     );
   }
 
@@ -209,7 +220,7 @@ export class CarpoolRideScene {
     const sessionId = match?.[1];
     if (sessionId) {
       await this.carpoolService.endRideSession(sessionId);
-      await ctx.reply("✅ Ride ended. Locations stopped.");
+      await ctx.reply("✅ Ride ended.");
     }
     await ctx.scene.enter("carpool_manage");
   }

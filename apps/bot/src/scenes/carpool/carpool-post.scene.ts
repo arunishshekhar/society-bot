@@ -14,7 +14,10 @@ import { mainMenuKeyboard } from "../../keyboards/main-menu.keyboard";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-/** Helper — returns false and replies if the carpool postDraft session is missing. */
+/**
+ * Fix #16: Centralised draft guard — used consistently across all handlers.
+ * Returns false (and handles the redirect) when the draft is missing.
+ */
 async function guardDraft(ctx: BotContext): Promise<boolean> {
   const draft = ctx.session.carpool?.postDraft;
   if (!draft) {
@@ -23,6 +26,25 @@ async function guardDraft(ctx: BotContext): Promise<boolean> {
     return false;
   }
   return true;
+}
+
+/** Build date-picker buttons for the next N days */
+function buildDateButtons(numDays = 7): { text: string; callback_data: string }[][] {
+  const buttons: { text: string; callback_data: string }[][] = [];
+  const now = new Date();
+  for (let i = 0; i < numDays; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + i);
+    const label =
+      i === 0
+        ? "Today"
+        : i === 1
+          ? "Tomorrow"
+          : d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+    const value = d.toISOString().split("T")[0]; // YYYY-MM-DD
+    buttons.push([{ text: label, callback_data: `carpool_post:date:${value}` }]);
+  }
+  return buttons;
 }
 
 @Scene("carpool_post")
@@ -85,27 +107,26 @@ export class CarpoolPostScene {
         await ctx.reply("Please use format like 9:00 AM");
         return;
       }
-      const draft = ctx.session.carpool?.postDraft;
-      if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
-      draft.departureTime = text;
+      if (!(await guardDraft(ctx))) return;
+      ctx.session.carpool!.postDraft!.departureTime = text;
       await this.askRouteType(ctx);
     } else if (step === "returnTime") {
       if (!text.match(/\d{1,2}:\d{2}\s*(AM|PM)/i)) {
         await ctx.reply("Please use format like 6:30 PM");
         return;
       }
-      const draft = ctx.session.carpool?.postDraft;
-      if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+      if (!(await guardDraft(ctx))) return;
+      const draft = ctx.session.carpool!.postDraft!;
       draft.returnTime = text;
 
+      // Fix #7: fetch return routes into a SEPARATE session slot
       const results = await this.orsService.getRoutes(
         draft.destinationLat!,
         draft.destinationLng!,
         draft.startLat!,
         draft.startLng!,
       );
-      if (!ctx.session.carpool) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
-      ctx.session.carpool.routeResults = results;
+      ctx.session.carpool!.returnRouteResults = results;
 
       if (!results.length) {
         await ctx.reply("Could not find a return route.");
@@ -128,25 +149,28 @@ export class CarpoolPostScene {
   @Action("carpool_post:start_society")
   async setStartSociety(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!(await guardDraft(ctx))) return;
+    const draft = ctx.session.carpool!.postDraft!;
     draft.startAddress = "The Society Location";
     draft.startLat = this.societyLat;
     draft.startLng = this.societyLng;
     ctx.session.carpool!.step = "destination";
 
     if (draft.destinationAddress && !draft.destinationLat) {
-       await this.searchLocation(ctx, draft.destinationAddress, "destination");
+      await this.searchLocation(ctx, draft.destinationAddress, "destination");
     } else {
-       await ctx.reply("Where are you going?\nType the destination name or select below.", Markup.inlineKeyboard([[Markup.button.callback("🏢 The Society Location", "carpool_post:dest_society")]]));
+      await ctx.reply(
+        "Where are you going?\nType the destination name or select below.",
+        Markup.inlineKeyboard([[Markup.button.callback("🏢 The Society Location", "carpool_post:dest_society")]]),
+      );
     }
   }
 
   @Action("carpool_post:dest_society")
   async setDestSociety(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!(await guardDraft(ctx))) return;
+    const draft = ctx.session.carpool!.postDraft!;
     draft.destinationAddress = "The Society Location";
     draft.destinationLat = this.societyLat;
     draft.destinationLng = this.societyLng;
@@ -156,7 +180,10 @@ export class CarpoolPostScene {
   @Action("carpool_post:retry_start")
   async retryStart(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
-    if (!ctx.session.carpool) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!ctx.session.carpool) {
+      await ctx.reply("❌ Session expired. Please start again.");
+      return ctx.scene.enter("carpool");
+    }
     ctx.session.carpool.step = "start";
     await ctx.reply("Type the starting location name again.");
   }
@@ -164,7 +191,10 @@ export class CarpoolPostScene {
   @Action("carpool_post:retry_dest")
   async retryDest(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
-    if (!ctx.session.carpool) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!ctx.session.carpool) {
+      await ctx.reply("❌ Session expired. Please start again.");
+      return ctx.scene.enter("carpool");
+    }
     ctx.session.carpool.step = "destination";
     await ctx.reply("Type the destination name again.");
   }
@@ -183,8 +213,8 @@ export class CarpoolPostScene {
     const place = ctx.session.carpool?.placeResults?.[index];
     if (!place) return;
 
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!(await guardDraft(ctx))) return;
+    const draft = ctx.session.carpool!.postDraft!;
 
     if (type === "start") {
       draft.startAddress = place.name;
@@ -193,9 +223,12 @@ export class CarpoolPostScene {
       ctx.session.carpool!.step = "destination";
 
       if (draft.destinationAddress && !draft.destinationLat) {
-         await this.searchLocation(ctx, draft.destinationAddress, "destination");
+        await this.searchLocation(ctx, draft.destinationAddress, "destination");
       } else {
-         await ctx.reply("Where are you going?\nType the destination name or select below.", Markup.inlineKeyboard([[Markup.button.callback("🏢 The Society Location", "carpool_post:dest_society")]]));
+        await ctx.reply(
+          "Where are you going?\nType the destination name or select below.",
+          Markup.inlineKeyboard([[Markup.button.callback("🏢 The Society Location", "carpool_post:dest_society")]]),
+        );
       }
     } else {
       draft.destinationAddress = place.name;
@@ -216,7 +249,9 @@ export class CarpoolPostScene {
       draft.destinationLng,
     );
     if (!ctx.session.carpool) return;
-    ctx.session.carpool.routeResults = results;
+
+    // Fix #7: store in the dedicated morning slot
+    ctx.session.carpool.morningRouteResults = results;
 
     if (!results.length) {
       await ctx.reply(
@@ -249,11 +284,13 @@ export class CarpoolPostScene {
         : null;
     if (!match) return;
     const index = parseInt(match[1]);
-    const route = ctx.session.carpool?.routeResults?.[index];
+
+    // Fix #7: read from the dedicated morning slot
+    const route = ctx.session.carpool?.morningRouteResults?.[index];
     if (!route) return;
 
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!(await guardDraft(ctx))) return;
+    const draft = ctx.session.carpool!.postDraft!;
 
     draft.morningPolyline = route.encodedPolyline;
     draft.morningDistanceKm = route.distanceKm;
@@ -278,14 +315,17 @@ export class CarpoolPostScene {
   @Action("carpool_post:time_ok")
   async timeOk(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
-    if (!ctx.session.carpool?.postDraft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!(await guardDraft(ctx))) return;
     await this.askRouteType(ctx);
   }
 
   @Action("carpool_post:time_change")
   async timeChange(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
-    if (!ctx.session.carpool) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!ctx.session.carpool) {
+      await ctx.reply("❌ Session expired. Please start again.");
+      return ctx.scene.enter("carpool");
+    }
     ctx.session.carpool.step = "departureTime";
     await ctx.reply("What time do you usually depart?\n(e.g. 8:30 AM)");
   }
@@ -308,24 +348,41 @@ export class CarpoolPostScene {
         ? ctx.callbackQuery.data.match(/carpool_post:type:(RECURRING|ONE_TIME)/)
         : null;
     const type = match?.[1];
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!(await guardDraft(ctx))) return;
+    const draft = ctx.session.carpool!.postDraft!;
 
     draft.type = type as "RECURRING" | "ONE_TIME";
 
     if (type === "RECURRING") {
       await this.promptDays(ctx);
     } else {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      draft.oneTimeDate = tomorrow;
-      await this.askSeats(ctx);
+      // Fix #8: ask the user to pick the actual date instead of hardcoding tomorrow
+      await ctx.reply(
+        "Which date is this one-time trip?",
+        Markup.inlineKeyboard(buildDateButtons(7)),
+      );
+      ctx.session.carpool!.step = "oneTimeDate";
     }
   }
 
+  /** Fix #8: handle the date picker selection for ONE_TIME routes */
+  @Action(/carpool_post:date:(\d{4}-\d{2}-\d{2})/)
+  async setOneTimeDate(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    const match =
+      ctx.callbackQuery && "data" in ctx.callbackQuery
+        ? ctx.callbackQuery.data.match(/carpool_post:date:(\d{4}-\d{2}-\d{2})/)
+        : null;
+    if (!match) return;
+    if (!(await guardDraft(ctx))) return;
+    const draft = ctx.session.carpool!.postDraft!;
+    draft.oneTimeDate = new Date(match[1]);
+    await this.askSeats(ctx);
+  }
+
   async promptDays(ctx: BotContext) {
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!(await guardDraft(ctx))) return;
+    const draft = ctx.session.carpool!.postDraft!;
     const selected = new Set(draft.recurringDays ?? []);
 
     await ctx.reply(
@@ -362,8 +419,8 @@ export class CarpoolPostScene {
         ? ctx.callbackQuery.data.match(/carpool_post:days_set:(weekdays|all)/)
         : null;
     const preset = match?.[1];
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!(await guardDraft(ctx))) return;
+    const draft = ctx.session.carpool!.postDraft!;
     if (preset === "weekdays") {
       draft.recurringDays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
     } else {
@@ -382,8 +439,8 @@ export class CarpoolPostScene {
     const day = match?.[1];
     if (!day) return;
 
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!(await guardDraft(ctx))) return;
+    const draft = ctx.session.carpool!.postDraft!;
     const selected = new Set(draft.recurringDays ?? []);
     if (selected.has(day)) selected.delete(day);
     else selected.add(day);
@@ -420,8 +477,8 @@ export class CarpoolPostScene {
   @Action("carpool_post:days_done")
   async daysDone(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!(await guardDraft(ctx))) return;
+    const draft = ctx.session.carpool!.postDraft!;
     if (!draft.recurringDays?.length) {
       await ctx.reply("Please select at least one day.");
       return;
@@ -452,8 +509,8 @@ export class CarpoolPostScene {
       ctx.callbackQuery && "data" in ctx.callbackQuery
         ? ctx.callbackQuery.data.match(/carpool_post:seats:(\d)/)
         : null;
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!(await guardDraft(ctx))) return;
+    const draft = ctx.session.carpool!.postDraft!;
     draft.seatsAvailable = parseInt(match?.[1] ?? "1");
     await this.askReturn(ctx);
   }
@@ -472,9 +529,8 @@ export class CarpoolPostScene {
   @Action("carpool_post:return:yes")
   async returnYes(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
-    draft.hasReturn = true;
+    if (!(await guardDraft(ctx))) return;
+    ctx.session.carpool!.postDraft!.hasReturn = true;
     ctx.session.carpool!.step = "returnTime";
     await ctx.reply("What time do you usually leave for home?\n(e.g. 6:30 PM)");
   }
@@ -482,9 +538,8 @@ export class CarpoolPostScene {
   @Action("carpool_post:return:no")
   async returnNo(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
-    draft.hasReturn = false;
+    if (!(await guardDraft(ctx))) return;
+    ctx.session.carpool!.postDraft!.hasReturn = false;
     await this.showSummary(ctx);
   }
 
@@ -497,12 +552,13 @@ export class CarpoolPostScene {
         : null;
     if (!match) return;
     const index = parseInt(match[1]);
-    const route = ctx.session.carpool?.routeResults?.[index];
+
+    // Fix #7: read from the dedicated RETURN slot
+    const route = ctx.session.carpool?.returnRouteResults?.[index];
     if (!route) return;
 
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
-    draft.returnPolyline = route.encodedPolyline;
+    if (!(await guardDraft(ctx))) return;
+    ctx.session.carpool!.postDraft!.returnPolyline = route.encodedPolyline;
     await this.askReturnSeats(ctx);
   }
 
@@ -529,20 +585,19 @@ export class CarpoolPostScene {
       ctx.callbackQuery && "data" in ctx.callbackQuery
         ? ctx.callbackQuery.data.match(/carpool_post:ret_seats:(\d)/)
         : null;
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
-    draft.returnSeatsAvailable = parseInt(match?.[1] ?? "1");
+    if (!(await guardDraft(ctx))) return;
+    ctx.session.carpool!.postDraft!.returnSeatsAvailable = parseInt(match?.[1] ?? "1");
     await this.showSummary(ctx);
   }
 
   async showSummary(ctx: BotContext) {
-    const draft = ctx.session.carpool?.postDraft;
-    if (!draft) { await ctx.reply("❌ Session expired. Please start again."); return ctx.scene.enter("carpool"); }
+    if (!(await guardDraft(ctx))) return;
+    const draft = ctx.session.carpool!.postDraft!;
 
     let text = `✅ *Review your carpool:*\n\n`;
     text += `🚗 *Trip: ${draft.startAddress} → ${draft.destinationAddress}*\n`;
     text += `   ${draft.morningDistanceKm} km\n`;
-    text += `   Departs: ${draft.departureTime} · ${draft.type === "RECURRING" ? draft.recurringDays?.join(",") : "One Time"} · ${draft.seatsAvailable} seats\n`;
+    text += `   Departs: ${draft.departureTime} · ${draft.type === "RECURRING" ? draft.recurringDays?.join(",") : `One Time (${draft.oneTimeDate ? new Date(draft.oneTimeDate).toLocaleDateString("en-IN") : ""})`} · ${draft.seatsAvailable} seats\n`;
 
     if (draft.hasReturn) {
       text += `\n🏠 *Return: ${draft.destinationAddress} → ${draft.startAddress}*\n`;
@@ -564,8 +619,9 @@ export class CarpoolPostScene {
   async saveRoute(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
 
-    // Guard against stale sessions / double-taps
     const draft = ctx.session.carpool?.postDraft;
+
+    // Fix #14: also validate returnSeatsAvailable when hasReturn is true
     if (
       !draft?.startLat ||
       !draft?.destinationLat ||
@@ -574,7 +630,8 @@ export class CarpoolPostScene {
       !draft?.morningPolyline ||
       !draft?.morningDistanceKm ||
       !draft?.morningDurationMin ||
-      !draft?.seatsAvailable
+      !draft?.seatsAvailable ||
+      (draft?.hasReturn && !draft?.returnSeatsAvailable)
     ) {
       await ctx.reply("❌ Route data is incomplete or your session expired. Please start again.");
       return ctx.scene.enter("carpool");
@@ -622,9 +679,7 @@ export class CarpoolPostScene {
   private async searchLocation(ctx: BotContext, query: string, targetStep: "start" | "destination") {
     const results = await this.photonService.search(query);
     if (!results.length) {
-      await ctx.reply(
-        `No results found for that location. Please type another name.`,
-      );
+      await ctx.reply(`No results found for that location. Please type another name.`);
       return;
     }
     if (!ctx.session.carpool) return;
@@ -637,13 +692,13 @@ export class CarpoolPostScene {
       ),
     ]);
     await ctx.reply(
-      `Select your ${targetStep === 'start' ? 'starting location' : 'destination'}:`,
+      `Select your ${targetStep === "start" ? "starting location" : "destination"}:`,
       Markup.inlineKeyboard([
         ...buttons,
         [
           Markup.button.callback(
             "Not listed, type again",
-            `carpool_post:retry_${targetStep === 'start' ? 'start' : 'dest'}`,
+            `carpool_post:retry_${targetStep === "start" ? "start" : "dest"}`,
           ),
         ],
       ]),

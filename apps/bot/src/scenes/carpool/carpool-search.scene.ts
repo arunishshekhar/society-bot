@@ -10,6 +10,9 @@ import { Direction } from "@prisma/client";
 import { SearchService } from "../../modules/search/search.service";
 import { mainMenuKeyboard } from "../../keyboards/main-menu.keyboard";
 
+/** Max pickup requests a seeker may send per hour (#11) */
+const RATE_LIMIT_PER_HOUR = 5;
+
 @Scene("carpool_search")
 @UseGuards(GroupMemberGuard)
 export class CarpoolSearchScene {
@@ -69,7 +72,7 @@ export class CarpoolSearchScene {
       startLat: this.societyLat,
       startLng: this.societyLng,
     };
-    ctx.session.carpool!.step = "pickup_location"; // "pickup_location" = destination step in search
+    ctx.session.carpool!.step = "pickup_location";
     await ctx.reply(
       "Where are you going?\nType the destination name or select below.",
       Markup.inlineKeyboard([
@@ -99,7 +102,6 @@ export class CarpoolSearchScene {
     if (!step || !text) return;
 
     if (step === "start") {
-      // Searching for start location
       const results = await this.photonService.search(text);
       if (!results.length) {
         await ctx.reply("No results found. Please try another name.");
@@ -121,7 +123,6 @@ export class CarpoolSearchScene {
         ]),
       );
     } else if (step === "pickup_location") {
-      // Searching for destination/end location
       const results = await this.photonService.search(text);
       if (!results.length) {
         await ctx.reply("No results found. Please try another name.");
@@ -245,9 +246,6 @@ export class CarpoolSearchScene {
   async findMatches(ctx: BotContext, time: string | null) {
     const draft = ctx.session.carpool!.searchDraft!;
 
-    // Infer direction: if start ≈ society → they're going out (MORNING),
-    // if destination ≈ society → they're coming home (RETURN).
-    // Default to MORNING when unclear (search both morningPolyline only as fallback).
     const direction = this.inferDirection(
       draft.startLat,
       draft.startLng,
@@ -255,20 +253,23 @@ export class CarpoolSearchScene {
       draft.pickupLng,
     );
 
-    // For the polyline proximity check, the "seeker location" is always the
-    // non-society end — so the point that must lie on the route.
-    // For MORNING: seeker is picked up from start → check startLat/Lng.
-    // For RETURN:  seeker is picked up from destination (work) → check pickupLat/Lng.
     const seekerLat = direction === "MORNING" ? draft.startLat! : draft.pickupLat!;
     const seekerLng = direction === "MORNING" ? draft.startLng! : draft.pickupLng!;
 
     await ctx.reply("🔍 Searching for pools near you...");
+
+    // Fix #12: resolve seeker's residentId so we can exclude their own routes
+    const seeker = await this.prisma.resident.findUnique({
+      where: { telegramId: BigInt(ctx.from!.id) },
+    });
 
     const results = await this.polylineService.findMatchingRoutes(
       seekerLat,
       seekerLng,
       time,
       direction,
+      null,
+      seeker?.id, // Fix #12: exclude own routes
     );
 
     if (!results.length) {
@@ -322,9 +323,6 @@ export class CarpoolSearchScene {
 
   /**
    * Infer MORNING vs RETURN from the start/end coordinates.
-   * If start is near the society → going out = MORNING.
-   * If destination is near society → coming home = RETURN.
-   * Falls back to MORNING if neither is close.
    */
   private inferDirection(
     startLat?: number,
@@ -374,6 +372,12 @@ export class CarpoolSearchScene {
     });
     if (!route) return;
 
+    // Fix #5: re-check isPaused — route may have been paused after search results were shown
+    if (route.isPaused) {
+      await ctx.reply("⚠️ This pool is no longer active. Please search again.");
+      return;
+    }
+
     const draft = ctx.session.carpool?.searchDraft;
     if (!draft) {
       await ctx.reply("Session expired. Please start again.");
@@ -387,6 +391,48 @@ export class CarpoolSearchScene {
       draft.pickupLng,
     );
 
+    const seeker = await this.prisma.resident.findUnique({
+      where: { telegramId: BigInt(ctx.from!.id) },
+    });
+    if (!seeker) return;
+
+    // Fix #12: don't allow requesting your own route
+    if (route.residentId === seeker.id) {
+      await ctx.reply("⚠️ You cannot request a pickup on your own route.");
+      return;
+    }
+
+    // Fix #11: rate limiting — max RATE_LIMIT_PER_HOUR requests per hour
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentCount = await this.prisma.carpoolRequest.count({
+      where: {
+        seekerId: seeker.id,
+        createdAt: { gte: oneHourAgo },
+      },
+    });
+    if (recentCount >= RATE_LIMIT_PER_HOUR) {
+      await ctx.reply(
+        `⚠️ You've sent ${RATE_LIMIT_PER_HOUR} requests in the last hour. Please wait before sending more.`,
+      );
+      return;
+    }
+
+    // Fix #9: prevent duplicate pending/accepted requests for the same route+direction
+    const existing = await this.prisma.carpoolRequest.findFirst({
+      where: {
+        routeId,
+        seekerId: seeker.id,
+        direction,
+        status: { in: ["PENDING", "ACCEPTED"] },
+      },
+    });
+    if (existing) {
+      await ctx.reply(
+        "⚠️ You already have a pending or accepted request for this route. Please wait for a response.",
+      );
+      return;
+    }
+
     const seats =
       direction === "MORNING" ? route.seatsAvailable : route.returnSeatsAvailable;
 
@@ -395,53 +441,55 @@ export class CarpoolSearchScene {
       return;
     }
 
-    const seeker = await this.prisma.resident.findUnique({
-      where: { telegramId: BigInt(ctx.from!.id) },
-    });
-    if (!seeker) return;
-
     const pickupAddress = direction === "MORNING" ? draft.startAddress : draft.pickupAddress;
     const pickupLat = direction === "MORNING" ? draft.startLat : draft.pickupLat;
     const pickupLng = direction === "MORNING" ? draft.startLng : draft.pickupLng;
 
-    // Create Request
-    const request = await this.prisma.carpoolRequest.create({
-      data: {
-        routeId,
-        seekerId: seeker.id,
-        direction,
-        pickupAddress: pickupAddress!,
-        pickupLat: pickupLat!,
-        pickupLng: pickupLng!,
-        distanceFromRoute: 0,
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 min
-      },
-    });
+    // Fix #1: atomic transaction — create request and decrement seat atomically
+    let request: { id: string };
+    try {
+      request = await this.prisma.$transaction(async (tx) => {
+        // Decrement first — if no seat is available the transaction rolls back
+        const updated = await tx.carpoolRoute.updateMany({
+          where: {
+            id: routeId,
+            ...(direction === "MORNING"
+              ? { seatsAvailable: { gt: 0 } }
+              : { returnSeatsAvailable: { gt: 0 } }),
+          },
+          data:
+            direction === "MORNING"
+              ? { seatsAvailable: { decrement: 1 } }
+              : { returnSeatsAvailable: { decrement: 1 } },
+        });
 
-    // Optimistically decrement seats — guard against going negative
-    if (direction === "MORNING") {
-      const updated = await this.prisma.carpoolRoute.updateMany({
-        where: { id: routeId, seatsAvailable: { gt: 0 } },
-        data: { seatsAvailable: { decrement: 1 } },
+        if (updated.count === 0) {
+          throw new Error("FULL");
+        }
+
+        return tx.carpoolRequest.create({
+          data: {
+            routeId,
+            seekerId: seeker.id,
+            direction,
+            pickupAddress: pickupAddress!,
+            pickupLat: pickupLat!,
+            pickupLng: pickupLng!,
+            distanceFromRoute: 0,
+            expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 min
+          },
+        });
       });
-      if (updated.count === 0) {
-        await this.prisma.carpoolRequest.delete({ where: { id: request.id } });
+    } catch (err: any) {
+      if (err?.message === "FULL") {
         await ctx.reply("⚠️ No seats available — someone else just took the last one.");
-        return;
+      } else {
+        await ctx.reply("⚠️ Failed to send request. Please try again.");
       }
-    } else {
-      const updated = await this.prisma.carpoolRoute.updateMany({
-        where: { id: routeId, returnSeatsAvailable: { gt: 0 } },
-        data: { returnSeatsAvailable: { decrement: 1 } },
-      });
-      if (updated.count === 0) {
-        await this.prisma.carpoolRequest.delete({ where: { id: request.id } });
-        await ctx.reply("⚠️ No return seats available — someone else just took the last one.");
-        return;
-      }
+      return;
     }
 
-    // Notify Offerer
+    // Notify the driver
     try {
       await ctx.telegram.sendMessage(
         route.resident.telegramId.toString(),

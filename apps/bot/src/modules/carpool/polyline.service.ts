@@ -19,12 +19,18 @@ export class PolylineService {
     requestedTime: string | null,
     direction: Direction,
     destinationQuery?: string | null,
+    /** Exclude the seeker's own routes (#12) */
+    seekerResidentId?: string,
   ): Promise<MatchResult[]> {
     const routes = await this.prisma.carpoolRoute.findMany({
       where: {
         isPaused: false,
-        ...(direction === "RETURN" ? { hasReturn: true } : {}),
-        seatsAvailable: { gt: 0 },
+        // Fix #3: filter by the correct seat column per direction
+        ...(direction === "RETURN"
+          ? { hasReturn: true, returnSeatsAvailable: { gt: 0 } }
+          : { seatsAvailable: { gt: 0 } }),
+        // Fix #12: exclude the seeker's own routes
+        ...(seekerResidentId ? { residentId: { not: seekerResidentId } } : {}),
         ...(destinationQuery
           ? {
               destinationAddress: {
@@ -44,13 +50,10 @@ export class PolylineService {
         direction === "MORNING" ? route.morningPolyline : route.returnPolyline;
       if (!routePolyline) continue;
 
-      // Sometimes ORS returns a geometry array instead of an encoded polyline depending on format.
-      // If it's a JSON array string, decode it. We assume it's encoded polyline as per spec.
       let points: [number, number][] = [];
       try {
         points = polyline.decode(routePolyline);
-      } catch (e) {
-        // Fallback or skip
+      } catch {
         continue;
       }
 
@@ -111,9 +114,8 @@ export class PolylineService {
 
   private isWithin30Min(time1: string, time2: string): boolean {
     const parse = (t: string) => {
-      // time might be "8:00 AM" or "8:00AM"
       const match = t.trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
-      if (!match) return 0; // fallback if invalid
+      if (!match) return 0;
 
       let h = parseInt(match[1]);
       const m = parseInt(match[2]);

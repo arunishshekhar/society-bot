@@ -215,6 +215,7 @@ export class AppUpdate {
     }
   }
 
+  /** Fix #2: seeker picks between two drivers who both accepted */
   @Action(/carpool_ride:choose:(.+)/)
   async chooseMultipleAccepts(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
@@ -225,12 +226,45 @@ export class AppUpdate {
         : null;
     const reqId = match?.[1];
     if (reqId) {
-      await this.carpoolService.acceptRequest(reqId, ctx);
+      await this.carpoolService.chooseBetweenAccepts(reqId, ctx);
       await ctx
-        .editMessageText(
-          "✅ You chose this driver! We have shared your contacts.",
-          { parse_mode: "Markdown" },
-        )
+        .editMessageReplyMarkup({ inline_keyboard: [] })
+        .catch(() => {});
+    }
+  }
+
+  /** Fix #4: seeker confirms they still want the accepted ride */
+  @Action(/carpool:seeker_confirm:(.+)/)
+  async seekerConfirmRide(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    if (!(await this.ensureActiveOnboardedResident(ctx))) return;
+    const match =
+      ctx.callbackQuery && "data" in ctx.callbackQuery
+        ? ctx.callbackQuery.data.match(/carpool:seeker_confirm:(.+)/)
+        : null;
+    const reqId = match?.[1];
+    if (reqId) {
+      await this.carpoolService.confirmBySeeker(reqId, ctx);
+      await ctx
+        .editMessageReplyMarkup({ inline_keyboard: [] })
+        .catch(() => {});
+    }
+  }
+
+  /** Fix #4: seeker cancels an accepted ride they no longer need */
+  @Action(/carpool:seeker_cancel:(.+)/)
+  async seekerCancelRide(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    if (!(await this.ensureActiveOnboardedResident(ctx))) return;
+    const match =
+      ctx.callbackQuery && "data" in ctx.callbackQuery
+        ? ctx.callbackQuery.data.match(/carpool:seeker_cancel:(.+)/)
+        : null;
+    const reqId = match?.[1];
+    if (reqId) {
+      await this.carpoolService.cancelBySeeker(reqId, ctx);
+      await ctx
+        .editMessageReplyMarkup({ inline_keyboard: [] })
         .catch(() => {});
     }
   }

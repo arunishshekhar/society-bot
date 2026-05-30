@@ -91,7 +91,10 @@ export class CarpoolManageScene {
     });
     if (!route) return this.showMine(ctx);
 
-    const text = `🚗 *Morning:* ${route.startAddress ?? 'Society'} → ${route.destinationAddress}\nDeparts: ${route.departureTime} · Seats: ${route.seatsAvailable}\n🏠 *Return:* ${route.hasReturn ? `Yes (${route.returnTime})` : "No"}`;
+    const returnInfo = route.hasReturn
+      ? `Yes (${route.returnTime} · ${route.returnSeatsAvailable ?? 0} seats)`
+      : "No";
+    const text = `🚗 *Morning:* ${route.startAddress ?? 'Society'} → ${route.destinationAddress}\nDeparts: ${route.departureTime} · Seats: ${route.seatsAvailable}\n🏠 *Return:* ${returnInfo}`;
 
     await ctx.reply(text, {
       parse_mode: "Markdown",

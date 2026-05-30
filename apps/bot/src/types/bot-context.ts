@@ -86,6 +86,7 @@ export interface BotSession extends Scenes.SceneSession<BotSceneSessionData> {
       | "destination"
       | "departureTime"
       | "returnTime"
+      | "oneTimeDate"
       | "pickup_location"
       | "time_filter";
     searchDirection?: string;
@@ -119,7 +120,10 @@ export interface BotSession extends Scenes.SceneSession<BotSceneSessionData> {
       pickupLng?: number;
     };
     placeResults?: PlaceResult[];
-    routeResults?: OrsRoute[];
+    /** Morning-direction route options from ORS */
+    morningRouteResults?: OrsRoute[];
+    /** Return-direction route options from ORS */
+    returnRouteResults?: OrsRoute[];
     selectedRouteId?: string;
     rideDirection?: string;
     rideRequests?: any[];
