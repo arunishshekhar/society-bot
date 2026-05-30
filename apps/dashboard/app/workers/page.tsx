@@ -105,15 +105,8 @@ export default async function WorkersPage({
                 <Input name="phone" placeholder="Phone" required className="bg-background" />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Category *</label>
-                <Select name="category" required>
-                  <SelectTrigger className="bg-background">
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allCategories.map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium">Category * (comma-separated)</label>
+                <Input name="category" placeholder="e.g. plumber, electrician" required className="bg-background" />
               </div>
               <div className="grid gap-2 sm:col-span-2">
                 <label className="text-sm font-medium">Notes</label>
@@ -195,15 +188,8 @@ export default async function WorkersPage({
                           <Input name="phone" defaultValue={text(w.phone)} placeholder="Phone" className="bg-background" />
                         </div>
                         <div className="grid gap-2">
-                          <label className="text-xs font-medium">Category</label>
-                          <Select name="category" defaultValue={String(w.category)}>
-                            <SelectTrigger className="bg-background">
-                              <SelectValue placeholder="Category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {allCategories.map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
+                          <label className="text-xs font-medium">Category (comma-separated)</label>
+                          <Input name="category" defaultValue={String(w.category)} placeholder="e.g. plumber, electrician" className="bg-background" />
                         </div>
                         <div className="grid gap-2 sm:col-span-2">
                           <label className="text-xs font-medium">Notes</label>

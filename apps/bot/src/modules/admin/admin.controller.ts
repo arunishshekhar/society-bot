@@ -232,6 +232,12 @@ export class AdminController {
   }
 
   // ── Broadcast ──────────────────────────────────────────────
+  @Get("broadcast")
+  broadcasts() {
+    this.logger.log("GET /admin/broadcast");
+    return this.admin.broadcasts();
+  }
+
   @Post("broadcast")
   @UseInterceptors(FileInterceptor("image", { limits: { fileSize: 5 * 1024 * 1024 } }))
   async broadcast(

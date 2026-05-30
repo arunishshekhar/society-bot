@@ -305,6 +305,12 @@ export class AdminService {
     });
   }
 
+  broadcasts() {
+    return this.prisma.broadcast.findMany({
+      orderBy: { sentAt: "desc" },
+    });
+  }
+
   // ── Lost & Found ───────────────────────────────────────────
   foundItems(status?: string) {
     return this.prisma.foundItem.findMany({
@@ -321,7 +327,21 @@ export class AdminService {
     });
   }
 
-  resolveFoundItem(id: string) {
+  async resolveFoundItem(id: string) {
+    const foundItem = await this.prisma.foundItem.findUnique({
+      where: { id },
+      include: { matches: true },
+    });
+    
+    if (foundItem?.matches?.length) {
+      for (const match of foundItem.matches) {
+        await this.prisma.lostItem.update({
+          where: { id: match.lostItemId },
+          data: { status: "RESOLVED", resolvedAt: new Date() },
+        }).catch(() => {});
+      }
+    }
+
     return this.prisma.foundItem.update({
       where: { id },
       data: { status: "RESOLVED", resolvedAt: new Date() },
@@ -347,7 +367,21 @@ export class AdminService {
     });
   }
 
-  resolveLostItem(id: string) {
+  async resolveLostItem(id: string) {
+    const lostItem = await this.prisma.lostItem.findUnique({
+      where: { id },
+      include: { matches: true },
+    });
+    
+    if (lostItem?.matches?.length) {
+      for (const match of lostItem.matches) {
+        await this.prisma.foundItem.update({
+          where: { id: match.foundItemId },
+          data: { status: "RESOLVED", resolvedAt: new Date() },
+        }).catch(() => {});
+      }
+    }
+
     return this.prisma.lostItem.update({
       where: { id },
       data: { status: "RESOLVED", resolvedAt: new Date() },

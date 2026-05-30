@@ -3,13 +3,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { broadcastAction } from '../actions/admin';
+import { adminFetch, AdminRecord, text } from '../lib/admin-api';
+import React from 'react';
+
+export const dynamic = 'force-dynamic';
 
 export default async function BroadcastPage({ searchParams }: { searchParams: Promise<{ sent?: string; error?: string }> }) {
   const { sent, error } = await searchParams;
+  const broadcasts = await adminFetch<AdminRecord[]>('/admin/broadcast') ?? [];
+
   return (
     <main className="container mx-auto max-w-4xl px-4 py-8">
-      <Card className="mx-auto max-w-2xl">
+      <Card className="mx-auto max-w-2xl mb-8">
         <CardHeader>
           <CardTitle className="text-2xl">Broadcast Message</CardTitle>
           <CardDescription>
@@ -25,7 +32,7 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
                 name="message"
                 placeholder="Type your message here..."
                 rows={5}
-                className="resize-y"
+                className="resize-y bg-background"
               />
             </div>
             <div className="grid gap-2">
@@ -35,7 +42,7 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
                 name="image"
                 type="file"
                 accept="image/*"
-                className="cursor-pointer"
+                className="cursor-pointer bg-background"
               />
             </div>
             
@@ -53,6 +60,47 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
             
             <SubmitButton className="w-full">Send Broadcast</SubmitButton>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card className="mx-auto max-w-2xl">
+        <CardHeader>
+          <CardTitle className="text-xl">Broadcast History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Message Preview</TableHead>
+                  <TableHead className="text-right">Recipients</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {broadcasts.map((b) => (
+                  <TableRow key={String(b.id)}>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {new Date(String(b.sentAt)).toLocaleDateString()} {new Date(String(b.sentAt)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate" title={text(b.message)}>
+                      {text(b.message) || "(Image only)"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {String(b.recipientCount)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {broadcasts.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="h-24 text-center">
+                      No past broadcasts found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </main>
