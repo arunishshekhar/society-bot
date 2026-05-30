@@ -48,7 +48,7 @@ model WorkerRecommendation {
   workerCode  String    @unique
   residentId  String?
   name        String
-  phone       String
+  phone       String    @unique
   category    String
   tags        String[]
   avgRating   Float?

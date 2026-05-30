@@ -1,6 +1,6 @@
 export function isValidName(value: string) {
   const trimmed = value.trim();
-  return trimmed.length >= 2 && trimmed.length <= 80;
+  return trimmed.length >= 2 && trimmed.length <= 80 && /^[a-zA-Z0-9]/.test(trimmed);
 }
 
 export function normalizeFlatNumber(value: string) {
@@ -9,9 +9,8 @@ export function normalizeFlatNumber(value: string) {
 
 export function isValidFlatNumber(value: string) {
   // Exactly 3 hyphen-separated alphanumeric segments (e.g. 03-12-03)
-  // OR a single alphanumeric string without hyphens (e.g. 3123)
   const trimmed = value.trim();
-  return /^[a-zA-Z0-9]{1,6}-[a-zA-Z0-9]{1,4}-[a-zA-Z0-9]{1,4}$/.test(trimmed) || /^[a-zA-Z0-9]{1,10}$/.test(trimmed);
+  return /^[a-zA-Z0-9]{1,6}-[a-zA-Z0-9]{1,4}-[a-zA-Z0-9]{1,4}$/.test(trimmed);
 }
 
 export function normalizeVehicleNumber(value: string) {

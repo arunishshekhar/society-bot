@@ -1,24 +1,50 @@
 import { Logger } from "@nestjs/common";
 import { BotContext } from "../types/bot-context";
+import { PrismaService } from "../prisma/prisma.service";
 
 const logger = new Logger("PrivateChatOnly");
 
 /**
- * Global middleware that silently drops any update that did not originate
- * from a private chat (i.e. group/supergroup/channel messages).
- *
- * This ensures users can only interact with the bot via DMs, not by
- * typing commands in the group itself.
+ * Global middleware that intercepts group messages.
+ * It drops regular messages but replies to commands with an instruction to use DMs.
  */
-export function createPrivateChatOnlyMiddleware() {
+export function createPrivateChatOnlyMiddleware(prisma: PrismaService) {
   return async (ctx: BotContext, next: () => Promise<void>) => {
     const chatType = ctx.chat?.type;
 
     if (chatType && chatType !== "private") {
+      // Allow new_chat_members events so we can send a welcome message in the group
+      if (ctx.message && "new_chat_members" in ctx.message) {
+        return await next();
+      }
+
+      // Intercept commands sent in the group
+      const text = (ctx.message as any)?.text;
+      if (text && text.startsWith('/')) {
+        const telegramId = ctx.from?.id;
+        let isRegistered = false;
+        
+        if (telegramId) {
+          const resident = await prisma.resident.findUnique({
+            where: { telegramId: BigInt(telegramId) },
+          });
+          isRegistered = resident?.onboardingComplete ?? false;
+        }
+
+        const instruction = isRegistered 
+          ? "use the /menu command to access society services" 
+          : "use the /start command to complete your registration";
+          
+        await ctx.reply(
+          `Hi! Please message me privately (@${ctx.botInfo.username}) and ${instruction}.`,
+          { disable_notification: true }
+        ).catch(() => {});
+      }
+
       logger.debug(
         `Ignoring update from chat type="${chatType}" chatId=${ctx.chat?.id}`,
       );
-      // Silently drop — don't reply so the bot doesn't spam group chats
+      // Drop — don't process further
       return;
     }
 

@@ -1,8 +1,10 @@
 import { Module } from "@nestjs/common";
 import { TelegrafModule } from "nestjs-telegraf";
+import { ScheduleModule } from "@nestjs/schedule";
 import { AppUpdate } from "./app.update";
 import { GroupMemberGuard } from "./guards/group-member.guard";
 import { HealthController } from "./health.controller";
+import { HealthCronService } from "./health-cron.service";
 import { PrismaModule } from "./prisma/prisma.module";
 import { PrismaService } from "./prisma/prisma.service";
 import { createPrismaSessionMiddleware } from "./sessions/prisma-session.middleware";
@@ -17,6 +19,7 @@ import { LostFoundModule } from "./modules/lost-found/lost-found.module";
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     PrismaModule,
     SearchModule,
     AdminModule,
@@ -29,7 +32,7 @@ import { LostFoundModule } from "./modules/lost-found/lost-found.module";
       useFactory: (prisma: PrismaService) => ({
         token: process.env.TELEGRAM_BOT_TOKEN ?? "",
         middlewares: [
-          createPrivateChatOnlyMiddleware(), // must be first — drops group/channel updates
+          createPrivateChatOnlyMiddleware(prisma), // must be first — intercepts group commands
           createPrismaSessionMiddleware(prisma),
           createIdleTimeoutMiddleware(),
         ],
@@ -46,6 +49,6 @@ import { LostFoundModule } from "./modules/lost-found/lost-found.module";
     }),
   ],
   controllers: [HealthController],
-  providers: [AppUpdate, GroupMemberGuard, ...scenes],
+  providers: [AppUpdate, GroupMemberGuard, HealthCronService, ...scenes],
 })
 export class AppModule {}

@@ -1,0 +1,10 @@
+#!/usr/bin/expect -f
+set timeout -1
+spawn npx prisma migrate dev --name add_unique_worker_phone
+expect {
+    "Are you sure you want create and apply this migration?" {
+        send "y\r"
+        exp_continue
+    }
+    eof
+}

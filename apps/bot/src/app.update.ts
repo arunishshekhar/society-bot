@@ -262,6 +262,23 @@ export class AppUpdate {
     }
   }
 
+  @On("new_chat_members")
+  async onNewChatMembers(@Ctx() ctx: BotContext) {
+    const newMembers = (ctx.message as any)?.new_chat_members;
+    if (!newMembers) return;
+    
+    for (const member of newMembers) {
+      if (member.is_bot) continue;
+      
+      const name = member.first_name || "Resident";
+      await ctx.reply(
+        `Hi ${name}, welcome to the community! 👋\n\n` +
+        `I am the Society Bot. Please start a private chat with me (@${ctx.botInfo.username}) to access all society services.`,
+        { disable_notification: true }
+      ).catch(() => {});
+    }
+  }
+
   private async showMainMenu(ctx: BotContext) {
     await ctx.reply("Society Bot", mainMenuKeyboard());
   }

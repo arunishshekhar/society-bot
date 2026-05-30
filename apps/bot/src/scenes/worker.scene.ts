@@ -217,7 +217,17 @@ export class WorkerScene {
     };
 
     if (field === "category") {
-      await this.promptCategories(ctx, "workers:set_category");
+      const worker = await this.prisma.workerRecommendation.findUnique({
+        where: { id: selectedId },
+      });
+      ctx.session.workers = {
+        mode: "editing",
+        step: "category",
+        selectedId,
+        editField: field,
+        draft: { category: worker?.category || "" },
+      };
+      await ctx.reply("Choose one or more categories, then click Done.", this.getCategoriesKeyboard(ctx, "workers:set_category"));
       return;
     }
 
@@ -226,45 +236,76 @@ export class WorkerScene {
 
   @Action(/workers:set_category:.+/)
   async setCategory(@Ctx() ctx: BotContext) {
-    await ctx.answerCbQuery();
-    const category = getCallbackData(ctx)?.split(":").slice(2).join(":");
+    const actionData = getCallbackData(ctx)?.split(":").slice(2).join(":");
     const state = ctx.session.workers;
-    if (!category || !state?.mode) return;
+    if (!actionData || !state?.mode) {
+      await ctx.answerCbQuery();
+      return;
+    }
 
-    if (state.mode === "editing" && state.selectedId) {
-      // Ownership check
-      const resident = await this.getResident(ctx);
-      const existingWorker = await this.prisma.workerRecommendation.findUnique({
-        where: { id: state.selectedId },
-      });
-      if (!resident || !existingWorker || existingWorker.residentId !== resident.id) {
-        await ctx.reply("You can only edit your own recommendations.");
-        await this.showMyRecommendations(ctx);
+    const currentSelected = state.draft?.category
+      ? state.draft.category.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [];
+
+    if (actionData === "done") {
+      await ctx.answerCbQuery();
+      if (currentSelected.length === 0) {
+        await ctx.reply("Please select at least one category.");
         return;
       }
-      await this.prisma.workerRecommendation.update({
-        where: { id: state.selectedId },
-        data: {
-          category,
-          tags: deriveWorkerTags(category, existingWorker.notes),
-        },
-      });
-      await ctx.reply("Recommendation updated.");
-      await this.showRecommendationDetail(ctx, state.selectedId, true);
+
+      if (state.mode === "editing" && state.selectedId) {
+        const resident = await this.getResident(ctx);
+        const existingWorker = await this.prisma.workerRecommendation.findUnique({
+          where: { id: state.selectedId },
+        });
+        if (!resident || !existingWorker || existingWorker.residentId !== resident.id) {
+          await ctx.reply("You can only edit your own recommendations.");
+          await this.showMyRecommendations(ctx);
+          return;
+        }
+        await this.prisma.workerRecommendation.update({
+          where: { id: state.selectedId },
+          data: {
+            category: currentSelected.join(', '),
+            tags: deriveWorkerTags(currentSelected.join(', '), existingWorker.notes),
+          },
+        });
+        await ctx.reply("Recommendation updated.");
+        await this.showRecommendationDetail(ctx, state.selectedId, true);
+        return;
+      }
+
+      ctx.session.workers = {
+        ...state,
+        step: "notes",
+      };
+      await ctx.reply(
+        "Add notes, or skip.",
+        Markup.inlineKeyboard([
+          [Markup.button.callback("Skip", "workers:skip_notes")],
+        ]),
+      );
       return;
+    }
+
+    const category = actionData;
+    let newSelected = [...currentSelected];
+    if (newSelected.includes(category)) {
+      newSelected = newSelected.filter((c: string) => c !== category);
+    } else {
+      newSelected.push(category);
     }
 
     ctx.session.workers = {
       ...state,
-      step: "notes",
-      draft: { ...state.draft, category },
+      draft: { ...state.draft, category: newSelected.join(', ') },
     };
-    await ctx.reply(
-      "Add notes, or skip.",
-      Markup.inlineKeyboard([
-        [Markup.button.callback("Skip", "workers:skip_notes")],
-      ]),
-    );
+
+    await ctx.editMessageReplyMarkup(
+      this.getCategoriesKeyboard(ctx, "workers:set_category").reply_markup
+    ).catch(() => {});
+    await ctx.answerCbQuery();
   }
 
   @Action("workers:skip_notes")
@@ -407,7 +448,7 @@ export class WorkerScene {
         step: "category",
         draft: { ...state.draft, phone: text },
       };
-      await this.promptCategories(ctx, "workers:set_category");
+      await ctx.reply("Choose one or more categories, then click Done.", this.getCategoriesKeyboard(ctx, "workers:set_category"));
       return;
     }
 
@@ -628,17 +669,26 @@ export class WorkerScene {
 
     const workerCode = await this.ratingService.generateUniqueCode();
 
-    await this.prisma.workerRecommendation.create({
-      data: {
-        workerCode,
-        residentId: resident.id,
-        name: draft.name,
-        phone: draft.phone,
-        category: draft.category,
-        notes,
-        tags: deriveWorkerTags(draft.category, notes),
-      },
-    });
+    try {
+      await this.prisma.workerRecommendation.create({
+        data: {
+          workerCode,
+          residentId: resident.id,
+          name: draft.name,
+          phone: draft.phone,
+          category: draft.category,
+          notes,
+          tags: deriveWorkerTags(draft.category, notes),
+        },
+      });
+    } catch (e: any) {
+      if (e.code === 'P2002') {
+        await ctx.reply("❌ A worker with this phone number already exists in the directory. You can find them and rate them instead!");
+        await this.showHome(ctx);
+        return;
+      }
+      throw e;
+    }
 
     ctx.session.workers = {};
     await ctx.reply(
@@ -663,15 +713,20 @@ export class WorkerScene {
     return worker?.category;
   }
 
-  private promptCategories(ctx: BotContext, prefix: string) {
-    return ctx.reply(
-      "Choose a category.",
-      Markup.inlineKeyboard(
-        categories.map((category) => [
-          Markup.button.callback(this.title(category), `${prefix}:${category}`),
-        ]),
-      ),
-    );
+  private getCategoriesKeyboard(ctx: BotContext, prefix: string) {
+    const selected = ctx.session.workers?.draft?.category
+      ? ctx.session.workers.draft.category.split(',').map((s: string) => s.trim())
+      : [];
+      
+    return Markup.inlineKeyboard([
+      ...categories.map((category) => [
+        Markup.button.callback(
+          `${selected.includes(category) ? "✅ " : ""}${this.title(category)}`,
+          `${prefix}:${category}`
+        ),
+      ]),
+      [Markup.button.callback("✅ Done", `${prefix}:done`)],
+    ]);
   }
 
   private backToWorkersKeyboard() {
