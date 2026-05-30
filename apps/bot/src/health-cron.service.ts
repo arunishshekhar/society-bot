@@ -9,9 +9,10 @@ export class HealthCronService {
   @Cron(CronExpression.EVERY_5_MINUTES)
   async handleCron() {
     // If webhook domain is defined, use it. Otherwise use localhost.
-    const baseUrl = process.env.WEBHOOK_DOMAIN 
-      ? `https://${process.env.WEBHOOK_DOMAIN}` 
-      : `http://localhost:${process.env.PORT || 3001}`;
+    let baseUrl = process.env.WEBHOOK_DOMAIN || `http://localhost:${process.env.PORT || 3001}`;
+    if (process.env.WEBHOOK_DOMAIN && !process.env.WEBHOOK_DOMAIN.startsWith('http')) {
+      baseUrl = `https://${process.env.WEBHOOK_DOMAIN}`;
+    }
       
     try {
       const response = await axios.get(`${baseUrl}/health`);
