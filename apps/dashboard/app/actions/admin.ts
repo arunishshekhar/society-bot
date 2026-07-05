@@ -215,6 +215,12 @@ export async function pingUnregisteredAction() {
   }
 }
 
+export async function deleteBroadcastAction(formData: FormData) {
+  const id = String(formData.get('id'));
+  await apiFetch(`/admin/broadcasts/${id}`, 'DELETE');
+  revalidatePath('/broadcast');
+}
+
 // ── Lost & Found ───────────────────────────────────────────
 export async function resolveFoundItemAction(formData: FormData) {
   const id = String(formData.get('id'));

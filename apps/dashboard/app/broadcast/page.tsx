@@ -3,9 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { broadcastAction } from '../actions/admin';
-import { adminFetch, AdminRecord, text } from '../lib/admin-api';
+import { adminFetch, AdminRecord } from '../lib/admin-api';
+import { BroadcastHistory } from './broadcast-history';
 import React from 'react';
 
 export const dynamic = 'force-dynamic';
@@ -77,7 +77,7 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
             await pingUnregisteredAction();
           }}>
             <p className="text-sm text-muted-foreground mb-4">
-              This action will scan the bot's database for users who haven't completed onboarding, check if they are currently members of the society group, and send a single message tagging all of them with instructions to start the bot.
+              This action will scan the bot&apos;s database for users who haven&apos;t completed onboarding, check if they are currently members of the society group, and send a single message tagging all of them with instructions to start the bot.
             </p>
             {pinged && (
               <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mb-4">
@@ -97,43 +97,16 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
       <Card className="mx-auto max-w-2xl">
         <CardHeader>
           <CardTitle className="text-xl">Broadcast History</CardTitle>
+          <CardDescription className="text-muted-foreground text-sm">
+            Delete a broadcast to attempt to recall messages from all recipients&apos; chats.
+            Note: Telegram limits bot message deletion to 48 hours.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Message Preview</TableHead>
-                  <TableHead className="text-right">Recipients</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {broadcasts.map((b) => (
-                  <TableRow key={String(b.id)}>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {new Date(String(b.sentAt)).toLocaleDateString()} {new Date(String(b.sentAt)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate" title={text(b.message)}>
-                      {text(b.message) || "(Image only)"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {String(b.recipientCount)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {broadcasts.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center">
-                      No past broadcasts found.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <BroadcastHistory broadcasts={broadcasts as any} />
         </CardContent>
       </Card>
     </main>
   );
 }
+

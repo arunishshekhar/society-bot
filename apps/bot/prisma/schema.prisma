@@ -209,11 +209,20 @@ model BotSession {
 }
 
 model Broadcast {
-  id             String   @id @default(uuid())
+  id             String                @id @default(uuid())
   message        String
   sentBy         String
-  sentAt         DateTime @default(now())
+  sentAt         DateTime              @default(now())
   recipientCount Int
+  recipients     BroadcastRecipient[]
+}
+
+model BroadcastRecipient {
+  id          String   @id @default(uuid())
+  broadcastId String
+  telegramId  BigInt
+  messageId   Int
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
 }
 
 model Faq {

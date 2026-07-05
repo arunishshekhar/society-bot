@@ -3,6 +3,7 @@ import { Markup } from "telegraf";
 import Groq from "groq-sdk";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { CacheService } from "../../cache/cache.service";
 import { RatingService } from "../workers/rating.service";
 import { normalizeSearchIntent, SearchIntent } from "./search-intent";
 import { BotContext } from "../../types/bot-context";
@@ -16,6 +17,7 @@ export class SearchService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
     private readonly ratingService: RatingService,
   ) {}
 
@@ -367,7 +369,10 @@ Respond ONLY with valid JSON.`,
   }
 
   async tryAnswerFromFaq(ctx: BotContext, query: string): Promise<boolean> {
-    const faqs = await this.prisma.faq.findMany();
+    // Use cache-first FAQ fetch — busted whenever admin creates/updates/deletes a FAQ
+    const cachedFaqs = this.cache.get<Array<{ question: string; answer: string }>>("faqs");
+    const faqs = cachedFaqs ?? await this.prisma.faq.findMany();
+    if (!cachedFaqs && faqs.length) this.cache.set("faqs", faqs);
     if (!faqs.length || !this.groq) {
       return false;
     }

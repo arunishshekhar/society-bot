@@ -1,9 +1,26 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
+import { CacheService } from "../../cache/cache.service";
+
+// Cache key constants
+const K = {
+  faqs: "faqs",
+  analytics: "analytics",
+  workers: "workers",
+  workersCat: (c: string) => `workers:category:${c}`,
+  categories: "categories",
+  categoriesType: (t: string) => `categories:type:${t}`,
+  activeResidents: "activeResidents",
+  services: "services",
+  broadcasts: "broadcasts",
+} as const;
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
+  ) {}
 
   // ── Residents ─────────────────────────────────────────────
   residents(search?: string) {
@@ -30,7 +47,7 @@ export class AdminService {
     });
   }
 
-  updateResident(
+  async updateResident(
     id: string,
     data: {
       name?: string;
@@ -39,11 +56,15 @@ export class AdminService {
       isActive?: boolean;
     },
   ) {
-    return this.prisma.resident.update({ where: { id }, data });
+    const result = await this.prisma.resident.update({ where: { id }, data });
+    this.cache.delAll(K.activeResidents, K.analytics);
+    return result;
   }
 
-  deleteResident(id: string) {
-    return this.prisma.resident.delete({ where: { id } });
+  async deleteResident(id: string) {
+    const result = await this.prisma.resident.delete({ where: { id } });
+    this.cache.delAll(K.activeResidents, K.analytics);
+    return result;
   }
 
   // ── Vehicles ───────────────────────────────────────────────
@@ -56,12 +77,18 @@ export class AdminService {
   }
 
   // ── Workers ────────────────────────────────────────────────
-  workers(category?: string) {
-    return this.prisma.workerRecommendation.findMany({
+  async workers(category?: string) {
+    const key = category ? K.workersCat(category) : K.workers;
+    const cached = this.cache.get(key);
+    if (cached !== undefined) return cached;
+
+    const result = await this.prisma.workerRecommendation.findMany({
       where: category ? { category } : undefined,
       include: { resident: { select: { flatNumber: true } } },
       orderBy: { createdAt: "desc" },
     });
+    this.cache.set(key, result);
+    return result;
   }
 
   async createWorker(data: {
@@ -79,7 +106,7 @@ export class AdminService {
         () => charset[Math.floor(Math.random() * charset.length)],
       ).join("");
       try {
-        return await this.prisma.workerRecommendation.create({
+        const result = await this.prisma.workerRecommendation.create({
           data: {
             workerCode,
             name: data.name,
@@ -89,6 +116,9 @@ export class AdminService {
             notes: data.notes ?? null,
           },
         });
+        this.cache.delAll(K.workers, K.analytics);
+        this.cache.delByPrefix("workers:category");
+        return result;
       } catch (err: any) {
         // P2002 = Unique constraint violation — try a different code
         if (err?.code !== "P2002") throw err;
@@ -97,7 +127,7 @@ export class AdminService {
     throw new Error("Could not generate a unique worker code after 10 attempts.");
   }
 
-  updateWorker(
+  async updateWorker(
     id: string,
     data: {
       name?: string;
@@ -109,46 +139,62 @@ export class AdminService {
   ) {
     // Explicitly pick known fields — never forward unknown keys to Prisma
     const { name, phone, category, notes, isActive } = data;
-    return this.prisma.workerRecommendation.update({
+    const result = await this.prisma.workerRecommendation.update({
       where: { id },
       data: { name, phone, category, notes, isActive },
     });
+    this.cache.delAll(K.workers, K.analytics);
+    this.cache.delByPrefix("workers:category");
+    return result;
   }
 
-  deleteWorker(id: string) {
-    return this.prisma.workerRecommendation.delete({ where: { id } });
+  async deleteWorker(id: string) {
+    const result = await this.prisma.workerRecommendation.delete({ where: { id } });
+    this.cache.delAll(K.workers, K.analytics);
+    this.cache.delByPrefix("workers:category");
+    return result;
   }
 
-  banWorker(id: string) {
-    return this.prisma.workerRecommendation.update({
+  async banWorker(id: string) {
+    const result = await this.prisma.workerRecommendation.update({
       where: { id },
       data: { isBanned: true, isActive: false },
     });
+    this.cache.delAll(K.workers, K.analytics);
+    this.cache.delByPrefix("workers:category");
+    return result;
   }
 
-  unbanWorker(id: string) {
-    return this.prisma.workerRecommendation.update({
+  async unbanWorker(id: string) {
+    const result = await this.prisma.workerRecommendation.update({
       where: { id },
       data: { isBanned: false, isActive: true },
     });
+    this.cache.delAll(K.workers, K.analytics);
+    this.cache.delByPrefix("workers:category");
+    return result;
   }
 
   // ── Services ───────────────────────────────────────────────
-  services() {
-    return this.prisma.microService.findMany({
+  async services() {
+    const cached = this.cache.get(K.services);
+    if (cached !== undefined) return cached;
+    const result = await this.prisma.microService.findMany({
       include: { resident: { select: { flatNumber: true } } },
       orderBy: { createdAt: "desc" },
     });
+    this.cache.set(K.services, result);
+    return result;
   }
 
-  createService(data: {
+  async createService(data: {
     name: string;
     category: string;
     description?: string | null;
     timing?: string;
     contactPreference?: string;
   }) {
-    return this.prisma.microService.create({
+    const result = await this.prisma.microService.create({
       data: {
         name: data.name,
         category: data.category,
@@ -159,9 +205,11 @@ export class AdminService {
         },
       },
     });
+    this.cache.delAll(K.services, K.analytics);
+    return result;
   }
 
-  updateService(
+  async updateService(
     id: string,
     data: {
       name?: string;
@@ -171,18 +219,24 @@ export class AdminService {
       isPaused?: boolean;
     },
   ) {
-    return this.prisma.microService.update({ where: { id }, data });
+    const result = await this.prisma.microService.update({ where: { id }, data });
+    this.cache.delAll(K.services, K.analytics);
+    return result;
   }
 
-  disableService(id: string, isDisabled = true) {
-    return this.prisma.microService.update({
+  async disableService(id: string, isDisabled = true) {
+    const result = await this.prisma.microService.update({
       where: { id },
       data: { isDisabled },
     });
+    this.cache.delAll(K.services, K.analytics);
+    return result;
   }
 
-  deleteService(id: string) {
-    return this.prisma.microService.delete({ where: { id } });
+  async deleteService(id: string) {
+    const result = await this.prisma.microService.delete({ where: { id } });
+    this.cache.delAll(K.services, K.analytics);
+    return result;
   }
 
   // ── Carpool ────────────────────────────────────────────────
@@ -193,7 +247,7 @@ export class AdminService {
     });
   }
 
-  updateCarpool(
+  async updateCarpool(
     id: string,
     data: {
       destinationAddress?: string;
@@ -203,57 +257,83 @@ export class AdminService {
       isPaused?: boolean;
     },
   ) {
-    return this.prisma.carpoolRoute.update({ where: { id }, data });
+    const result = await this.prisma.carpoolRoute.update({ where: { id }, data });
+    this.cache.del(K.analytics);
+    return result;
   }
 
-  deleteCarpool(id: string) {
-    return this.prisma.carpoolRoute.delete({ where: { id } });
+  async deleteCarpool(id: string) {
+    const result = await this.prisma.carpoolRoute.delete({ where: { id } });
+    this.cache.del(K.analytics);
+    return result;
   }
 
   // ── Categories ─────────────────────────────────────────────
-  categories(type?: string) {
-    return this.prisma.category.findMany({
+  async categories(type?: string) {
+    const key = type ? K.categoriesType(type) : K.categories;
+    const cached = this.cache.get(key);
+    if (cached !== undefined) return cached;
+
+    const result = await this.prisma.category.findMany({
       where: type ? { type } : undefined,
       orderBy: { name: "asc" },
     });
+    this.cache.set(key, result);
+    return result;
   }
 
-  createCategory(name: string, type: string) {
-    return this.prisma.category.create({
+  async createCategory(name: string, type: string) {
+    const result = await this.prisma.category.create({
       data: { name: name.trim().toLowerCase(), type },
     });
+    this.cache.delAll(K.categories);
+    this.cache.delByPrefix("categories:type");
+    return result;
   }
 
-  deleteCategory(id: string) {
-    return this.prisma.category.delete({ where: { id } });
+  async deleteCategory(id: string) {
+    const result = await this.prisma.category.delete({ where: { id } });
+    this.cache.delAll(K.categories);
+    this.cache.delByPrefix("categories:type");
+    return result;
   }
 
   // ── FAQs ───────────────────────────────────────────────────
-  faqs() {
-    return this.prisma.faq.findMany({
+  async faqs() {
+    const cached = this.cache.get<unknown[]>(K.faqs);
+    if (cached !== undefined) return cached;
+    const result = await this.prisma.faq.findMany({
       orderBy: { createdAt: "desc" },
     });
+    this.cache.set(K.faqs, result);
+    return result;
   }
 
-  createFaq(data: { question: string; answer: string }) {
-    return this.prisma.faq.create({
-      data: {
-        question: data.question,
-        answer: data.answer,
-      },
+  async createFaq(data: { question: string; answer: string }) {
+    const result = await this.prisma.faq.create({
+      data: { question: data.question, answer: data.answer },
     });
+    this.cache.del(K.faqs);
+    return result;
   }
 
-  updateFaq(id: string, data: { question?: string; answer?: string }) {
-    return this.prisma.faq.update({ where: { id }, data });
+  async updateFaq(id: string, data: { question?: string; answer?: string }) {
+    const result = await this.prisma.faq.update({ where: { id }, data });
+    this.cache.del(K.faqs);
+    return result;
   }
 
-  deleteFaq(id: string) {
-    return this.prisma.faq.delete({ where: { id } });
+  async deleteFaq(id: string) {
+    const result = await this.prisma.faq.delete({ where: { id } });
+    this.cache.del(K.faqs);
+    return result;
   }
 
   // ── Analytics + Broadcast ──────────────────────────────────
   async analytics() {
+    const cached = this.cache.get(K.analytics);
+    if (cached !== undefined) return cached;
+
     const [
       totalResidents,
       activeServices,
@@ -283,7 +363,7 @@ export class AdminService {
       }),
     ]);
 
-    return {
+    const result = {
       totalResidents,
       activeServices,
       activeCarpools,
@@ -291,12 +371,18 @@ export class AdminService {
       recentResidents,
       workerGroups,
     };
+    this.cache.set(K.analytics, result);
+    return result;
   }
 
-  activeResidents() {
-    return this.prisma.resident.findMany({
+  async activeResidents() {
+    const cached = this.cache.get<unknown[]>(K.activeResidents);
+    if (cached !== undefined) return cached as any[];
+    const result = await this.prisma.resident.findMany({
       where: { isActive: true, onboardingComplete: true },
     });
+    this.cache.set(K.activeResidents, result);
+    return result;
   }
 
   unregisteredResidents() {
@@ -305,16 +391,59 @@ export class AdminService {
     });
   }
 
-  logBroadcast(message: string, sentBy: string, recipientCount: number) {
-    return this.prisma.broadcast.create({
-      data: { message, sentBy, recipientCount },
+  async logBroadcast(
+    message: string,
+    sentBy: string,
+    recipients: Array<{ telegramId: bigint; messageId: number }>,
+  ) {
+    const broadcast = await this.prisma.broadcast.create({
+      data: {
+        message,
+        sentBy,
+        recipientCount: recipients.length,
+        recipients: {
+          create: recipients.map((r) => ({
+            id: require("crypto").randomUUID(),
+            telegramId: r.telegramId,
+            messageId: r.messageId,
+          })),
+        },
+      },
     });
+    this.cache.del(K.broadcasts);
+    return broadcast;
   }
 
-  broadcasts() {
-    return this.prisma.broadcast.findMany({
+  async broadcasts() {
+    const cached = this.cache.get(K.broadcasts);
+    if (cached !== undefined) return cached;
+    const result = await this.prisma.broadcast.findMany({
       orderBy: { sentAt: "desc" },
     });
+    this.cache.set(K.broadcasts, result);
+    return result;
+  }
+
+  async deleteBroadcast(id: string, bot: import("telegraf").Telegraf<any>) {
+    // Load all recipient records for this broadcast
+    const recipients = await this.prisma.broadcastRecipient.findMany({
+      where: { broadcastId: id },
+    });
+
+    // Attempt to delete each Telegram message — silently ignore failures
+    // (user may have blocked the bot, deleted the chat, or the message may be too old)
+    for (const r of recipients) {
+      try {
+        await bot.telegram.deleteMessage(Number(r.telegramId), r.messageId);
+      } catch {
+        // Non-fatal — Telegram messages older than 48h cannot be deleted by bots
+      }
+    }
+
+    // Delete the broadcast log (cascade deletes BroadcastRecipient rows)
+    const result = await this.prisma.broadcast.delete({ where: { id } });
+    this.cache.del(K.broadcasts);
+    return result;
   }
 
   // ── Lost & Found ───────────────────────────────────────────

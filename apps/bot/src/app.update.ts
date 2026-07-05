@@ -3,6 +3,7 @@ import { Action, Command, Ctx, Start, Update, On } from "nestjs-telegraf";
 import { mainMenuKeyboard } from "./keyboards/main-menu.keyboard";
 import { PrismaService } from "./prisma/prisma.service";
 import { SearchService } from "./modules/search/search.service";
+import { AiChatService } from "./modules/search/ai-chat.service";
 import { BotContext } from "./types/bot-context";
 import { CarpoolService } from "./modules/carpool/carpool.service";
 import { LostFoundService } from "./modules/lost-found/lost-found.service";
@@ -14,6 +15,7 @@ export class AppUpdate {
   constructor(
     private readonly prisma: PrismaService,
     private readonly searchService: SearchService,
+    private readonly aiChatService: AiChatService,
     private readonly carpoolService: CarpoolService,
     private readonly lostFoundService: LostFoundService,
   ) {}
@@ -335,6 +337,33 @@ export class AppUpdate {
 
   private async showMainMenu(ctx: BotContext) {
     await ctx.reply("Society Bot", mainMenuKeyboard());
+  }
+
+  /**
+   * Catch-all for plain text messages sent outside any active scene.
+   * Routes the message to the persistent AI conversation session.
+   *
+   * Priority order (NestJS-Telegraf registers handlers in declaration order):
+   *   1. @Start / @Command handlers (registered above — take precedence)
+   *   2. @On('text') — only reached when no command matched
+   *
+   * Scene-internal text is handled by the scene itself and never reaches here
+   * because Telegraf's scene middleware intercepts it first.
+   */
+  @On("text")
+  async onText(@Ctx() ctx: BotContext) {
+    const text = (ctx.message as { text?: string })?.text ?? "";
+
+    // Skip slash-commands (already handled by dedicated @Command decorators)
+    if (text.startsWith("/")) return;
+
+    // Skip if the user is inside a scene — the scene owns all text input
+    if ((ctx as any).scene?.current) return;
+
+    if (!(await this.ensureActiveOnboardedResident(ctx))) return;
+
+    this.logger.log(`[ai-chat] userId=${ctx.from?.id} text="${text.slice(0, 60)}"`); 
+    await this.aiChatService.handleMessage(ctx, text);
   }
 
   private async enterScene(ctx: BotContext, sceneId: string) {

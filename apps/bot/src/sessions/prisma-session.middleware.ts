@@ -16,11 +16,23 @@ export function createPrismaSessionMiddleware(prisma: PrismaService) {
     });
 
     ctx.session = (savedSession?.sessionData as BotSession | null) ?? {};
+
+    // Snapshot before the handler runs so we can diff afterward.
+    const snapshotBefore = JSON.stringify(ctx.session);
+
     await next();
 
     const sessionData = JSON.parse(
       JSON.stringify(ctx.session ?? {}),
     ) as InputJsonValue;
+
+    // Only write to the DB if session actually changed — this eliminates
+    // redundant writes on every view-only interaction (menu browsing, etc.)
+    // and significantly reduces free-tier DB compute usage.
+    const snapshotAfter = JSON.stringify(ctx.session ?? {});
+    if (snapshotBefore === snapshotAfter) {
+      return;
+    }
 
     await prisma.botSession.upsert({
       where: { telegramId: BigInt(telegramId) },
@@ -34,3 +46,4 @@ export function createPrismaSessionMiddleware(prisma: PrismaService) {
     });
   };
 }
+

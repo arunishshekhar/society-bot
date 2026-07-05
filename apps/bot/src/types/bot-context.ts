@@ -144,6 +144,18 @@ export interface BotSession extends Scenes.SceneSession<BotSceneSessionData> {
   };
   lostItemStep?: "description";
 
+  /**
+   * Persistent AI conversation session.
+   * History is reset automatically when idle for > 10 minutes.
+   * Stored in the existing BotSession table — no schema migration needed.
+   */
+  aiChat?: {
+    /** Conversation turns (user + assistant), capped at 20 entries. */
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    /** Timestamp of the last message — used to detect 10-min idle. */
+    lastMessageAt: number;
+  };
+
   __lastActivity?: number;
 }
 

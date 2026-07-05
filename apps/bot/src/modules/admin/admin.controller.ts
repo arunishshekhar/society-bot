@@ -237,6 +237,13 @@ export class AdminController {
     this.logger.log("GET /admin/broadcast");
     return this.admin.broadcasts();
   }
+
+  @Delete("broadcasts/:id")
+  async deleteBroadcast(@Param("id") id: string) {
+    this.logger.log(`DELETE /admin/broadcasts/${id}`);
+    return this.admin.deleteBroadcast(id, this.bot);
+  }
+
   @Post("ping-unregistered")
   async pingUnregistered() {
     this.logger.log("POST /admin/ping-unregistered");
@@ -274,8 +281,8 @@ export class AdminController {
 
     await this.bot.telegram.sendMessage(chatId, message, { parse_mode: "Markdown" });
     
-    // Log it as a broadcast
-    await this.admin.logBroadcast("Pinged unregistered members", "dashboard", mentions.length);
+    // Log it as a broadcast (no per-recipient message IDs for group pings)
+    await this.admin.logBroadcast("Pinged unregistered members", "dashboard", []);
 
     return { recipientCount: mentions.length };
   }
@@ -295,13 +302,17 @@ export class AdminController {
 
     const imageBuffer = file && file.size > 0 ? file.buffer : null;
 
-    let sent = 0;
+    // Track sent recipients with their Telegram message IDs for future deletion
+    const successfulRecipients: Array<{ telegramId: bigint; messageId: number }> = [];
     let useMarkdown = true;
+
     for (const resident of residents) {
       try {
+        let sentMsg: { message_id: number } | undefined;
+
         if (useMarkdown) {
           if (imageBuffer) {
-            await this.bot.telegram.sendPhoto(
+            sentMsg = await this.bot.telegram.sendPhoto(
               Number(resident.telegramId),
               { source: imageBuffer },
               {
@@ -310,46 +321,57 @@ export class AdminController {
               },
             );
           } else {
-            await this.bot.telegram.sendMessage(
+            sentMsg = await this.bot.telegram.sendMessage(
               Number(resident.telegramId),
               `Society Notice\n\n${message}`,
               { parse_mode: "MarkdownV2" },
             );
           }
-          sent += 1;
         } else {
           if (imageBuffer) {
-            await this.bot.telegram.sendPhoto(
+            sentMsg = await this.bot.telegram.sendPhoto(
               Number(resident.telegramId),
               { source: imageBuffer },
               { caption: `Society Notice\n\n${message}` }
             );
           } else {
-            await this.bot.telegram.sendMessage(
+            sentMsg = await this.bot.telegram.sendMessage(
               Number(resident.telegramId),
               `Society Notice\n\n${message}`
             );
           }
-          sent += 1;
+        }
+
+        if (sentMsg?.message_id) {
+          successfulRecipients.push({
+            telegramId: resident.telegramId,
+            messageId: sentMsg.message_id,
+          });
         }
       } catch (error: any) {
         this.logger.error(`Broadcast failed for ${resident.telegramId}: ${error.message || error}`);
         if (useMarkdown && error.response?.description?.includes("can't parse entities")) {
           useMarkdown = false;
           try {
+            let sentMsg: { message_id: number } | undefined;
             if (imageBuffer) {
-              await this.bot.telegram.sendPhoto(
+              sentMsg = await this.bot.telegram.sendPhoto(
                 Number(resident.telegramId),
                 { source: imageBuffer },
                 { caption: `Society Notice\n\n${message}` }
               );
             } else {
-              await this.bot.telegram.sendMessage(
+              sentMsg = await this.bot.telegram.sendMessage(
                 Number(resident.telegramId),
                 `Society Notice\n\n${message}`
               );
             }
-            sent += 1;
+            if (sentMsg?.message_id) {
+              successfulRecipients.push({
+                telegramId: resident.telegramId,
+                messageId: sentMsg.message_id,
+              });
+            }
           } catch (fallbackError: any) {
             this.logger.error(`Fallback failed for ${resident.telegramId}: ${fallbackError.message || fallbackError}`);
           }
@@ -357,9 +379,10 @@ export class AdminController {
         // Keep broadcasting to remaining residents.
       }
     }
-    await this.admin.logBroadcast(message, sentBy ?? "admin", sent);
-    this.logger.log(`Broadcast complete: sent=${sent}/${residents.length}`);
-    return { recipientCount: sent };
+
+    await this.admin.logBroadcast(message, sentBy ?? "admin", successfulRecipients);
+    this.logger.log(`Broadcast complete: sent=${successfulRecipients.length}/${residents.length}`);
+    return { recipientCount: successfulRecipients.length };
   }
 
   // ── FAQs ───────────────────────────────────────────────────

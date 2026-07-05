@@ -16,10 +16,12 @@ import { AdminModule } from "./modules/admin/admin.module";
 import { CarpoolModule } from "./modules/carpool/carpool.module";
 import { WorkersModule } from "./modules/workers/workers.module";
 import { LostFoundModule } from "./modules/lost-found/lost-found.module";
+import { CacheModule } from "./cache/cache.module";
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    CacheModule,
     PrismaModule,
     SearchModule,
     AdminModule,
