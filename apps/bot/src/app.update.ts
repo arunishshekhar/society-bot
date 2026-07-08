@@ -4,6 +4,7 @@ import { mainMenuKeyboard } from "./keyboards/main-menu.keyboard";
 import { PrismaService } from "./prisma/prisma.service";
 import { SearchService } from "./modules/search/search.service";
 import { AiChatService } from "./modules/search/ai-chat.service";
+import { GroupAnswerService } from "./modules/search/group-answer.service";
 import { BotContext } from "./types/bot-context";
 import { CarpoolService } from "./modules/carpool/carpool.service";
 import { LostFoundService } from "./modules/lost-found/lost-found.service";
@@ -16,6 +17,7 @@ export class AppUpdate {
     private readonly prisma: PrismaService,
     private readonly searchService: SearchService,
     private readonly aiChatService: AiChatService,
+    private readonly groupAnswerService: GroupAnswerService,
     private readonly carpoolService: CarpoolService,
     private readonly lostFoundService: LostFoundService,
   ) {}
@@ -357,6 +359,13 @@ export class AppUpdate {
     // Skip slash-commands (already handled by dedicated @Command decorators)
     if (text.startsWith("/")) return;
 
+    // ── Group chat handling ──────────────────────────────────────────────────
+    if (ctx.chat?.type !== "private") {
+      await this.handleGroupText(ctx, text);
+      return;
+    }
+
+    // ── Private chat handling ────────────────────────────────────────────────
     // Skip if the user is inside a scene — the scene owns all text input
     if ((ctx as any).scene?.current) return;
 
@@ -364,6 +373,104 @@ export class AppUpdate {
 
     this.logger.log(`[ai-chat] userId=${ctx.from?.id} text="${text.slice(0, 60)}"`); 
     await this.aiChatService.handleMessage(ctx, text);
+  }
+
+  /**
+   * Handles text messages that arrived in the group chat.
+   *
+   * Two cases:
+   *  A) Reply to the bot's message — always respond (answer or escalate to admins).
+   *  B) Question-like text — attempt answer; stay silent on no match.
+   *
+   * Conversations are tracked for 1 hour of inactivity per thread.
+   */
+  private async handleGroupText(ctx: BotContext, text: string): Promise<void> {
+    const msg = ctx.message as any;
+    const chatId = ctx.chat!.id;
+    const botId = ctx.botInfo?.id;
+    const replyTo = msg?.reply_to_message;
+    const isReplyToBot = replyTo && botId && replyTo.from?.id === botId;
+
+    if (isReplyToBot) {
+      // ── A: User replied to the bot ──────────────────────────────────────
+      const convKey = `${chatId}:${replyTo.message_id}`;
+      const history = this.groupAnswerService.getHistory(convKey) ?? [];
+
+      // Always append the new user message to conversation
+      this.groupAnswerService.appendTurn(convKey, 'user', text);
+      const updatedHistory = this.groupAnswerService.getHistory(convKey) ?? [];
+
+      this.logger.log(
+        `[group-reply] chatId=${chatId} user=${ctx.from?.id} text="${text.slice(0, 60)}"`,
+      );
+
+      const answer = await this.groupAnswerService.tryAnswer(text, history);
+
+      if (answer) {
+        // Bot can answer — reply in thread
+        const sent = await ctx.reply(answer, {
+          reply_parameters: { message_id: msg.message_id },
+          disable_notification: true,
+        } as any);
+        this.groupAnswerService.appendTurn(convKey, 'assistant', answer);
+        // Re-key the conversation under the new bot message so future replies chain
+        const newKey = `${chatId}:${sent.message_id}`;
+        const fullHistory = updatedHistory.concat([{ role: 'assistant', content: answer }]);
+        // Replace conversation under new key
+        this.groupAnswerService.end(convKey);
+        this.groupAnswerService.startConversation(
+          newKey,
+          updatedHistory[updatedHistory.length - 1]?.content ?? text,
+          answer,
+        );
+        // Restore full history
+        for (let i = 0; i < fullHistory.length - 2; i++) {
+          this.groupAnswerService.appendTurn(newKey, fullHistory[i].role, fullHistory[i].content);
+        }
+      } else {
+        // Bot can't answer — escalate to admins with full conversation history
+        const admins = await this.groupAnswerService.getAdminMentions(ctx);
+        const historyText = this.groupAnswerService.formatHistory(convKey);
+
+        const escalationMsg =
+          `❓ I don't have a definitive answer to this. Please contact the society admins.\n\n` +
+          `${admins}\n\n` +
+          `📋 *Conversation summary:*\n${historyText}`;
+
+        await ctx.reply(escalationMsg, {
+          reply_parameters: { message_id: msg.message_id },
+          parse_mode: 'Markdown',
+          disable_notification: true,
+        } as any);
+
+        // End the conversation thread after escalation
+        this.groupAnswerService.end(convKey);
+      }
+      return;
+    }
+
+    // ── B: Proactive question in group ──────────────────────────────────────
+    this.logger.log(
+      `[group-question] chatId=${chatId} user=${ctx.from?.id} text="${text.slice(0, 60)}"`,
+    );
+
+    const answer = await this.groupAnswerService.tryAnswer(text);
+    if (!answer) {
+      // No confident answer — stay silent
+      return;
+    }
+
+    // Reply inline and start tracking the conversation
+    const sent = await ctx.reply(answer, {
+      reply_parameters: { message_id: msg.message_id },
+      disable_notification: true,
+    } as any);
+
+    this.groupAnswerService.startConversation(
+      `${chatId}:${sent.message_id}`,
+      text,
+      answer,
+    );
   }
 
   private async enterScene(ctx: BotContext, sceneId: string) {
