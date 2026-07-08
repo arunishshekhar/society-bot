@@ -18,14 +18,20 @@ interface GroupConversation {
 }
 
 const SYSTEM_PROMPT = `You are the Society Bot — an assistant for a residential housing society group chat.
-You have access to the society's official data (FAQs, workers, services) provided below.
+You have access to the society's official data provided below.
 
 CRITICAL RULES:
-1. ONLY answer using the data provided — never guess, infer, or hallucinate.
-2. If you cannot answer with 100% certainty from the data, respond with EXACTLY: NO_MATCH
-3. Never invent contact numbers, flat numbers, names, or personal details.
-4. If the answer contains phone numbers, always use the +91 prefix.
-5. Keep answers concise, factual, and friendly.`;
+1. ONLY answer using the provided data — never guess, infer, or hallucinate.
+2. If you cannot answer with 100% certainty from the provided data, respond with EXACTLY: NO_MATCH
+3. PRIVACY — NEVER reveal under any circumstances:
+   - Any resident's name, flat number, phone number, or Telegram identity
+   - Any vehicle plate number, color, model, or owner
+   - Who added a worker or service
+   - Who reported or claimed a lost/found item
+4. Worker phone numbers ARE public (they consented) — include them with +91 prefix.
+5. Carpool: share destination, departure time, seats, and route type only — never the offerer's identity.
+6. Lost & Found: share item descriptions and collection location only — never the reporter's identity.
+7. Keep answers concise, factual, and friendly.`;
 
 @Injectable()
 export class GroupAnswerService {
@@ -221,64 +227,144 @@ export class GroupAnswerService {
     }
   }
 
+  /**
+   * Builds safe DB context for a question.
+   * Privacy rules strictly applied — NO resident PII, NO vehicle data.
+   */
   private async buildDbContext(question: string): Promise<string> {
     const parts: string[] = [];
     const lower = question.toLowerCase();
 
-    // Workers — only query if query seems worker-related
+    // ── Workers (phone is public — workers opted in) ───────────────────────
     if (
-      /(maid|cook|plumber|electrician|carpenter|driver|repair|clean|worker|helper|labour|painter|ac|geyser|pest)/.test(
-        lower,
-      )
+      /(maid|cook|plumber|electrician|carpenter|driver|repair|clean|worker|helper|labour|painter|ac|geyser|pest|colour|color)/.test(lower)
     ) {
       try {
         const workers = await this.prisma.workerRecommendation.findMany({
           where: { isActive: true, isBanned: false },
+          // Do NOT include resident relation — keeps adder identity private
           orderBy: [{ avgRating: 'desc' }, { createdAt: 'desc' }],
           take: 10,
         });
         if (workers.length) {
           parts.push(
             '<workers>\n' +
-              workers
-                .map(
-                  (w) =>
-                    `Name: ${w.name} | Category: ${w.category} | Phone: ${
-                      w.phone.startsWith('+') ? w.phone : '+91' + w.phone
-                    } | Code: ${w.workerCode}${w.notes ? ` | Notes: ${w.notes}` : ''}`,
-                )
-                .join('\n') +
+              workers.map((w) => {
+                const phone = w.phone.startsWith('+') ? w.phone : '+91' + w.phone;
+                const rating = w.avgRating ? ` | Rating: ${w.avgRating.toFixed(1)}★` : '';
+                return `Name: ${w.name} | Category: ${w.category} | Phone: ${phone} | Code: ${w.workerCode}${rating}${w.notes ? ` | Notes: ${w.notes}` : ''}`;
+              }).join('\n') +
               '\n</workers>',
           );
         }
       } catch {}
     }
 
-    // Services — only query if query seems service-related
+    // ── MicroServices (resident identity NOT exposed) ──────────────────────
     if (
-      /(tiffin|tutor|tuition|laundry|tailor|food|meal|service|delivery|class)/.test(
-        lower,
-      )
+      /(tiffin|tutor|tuition|laundry|tailor|food|meal|service|delivery|class|daycare|pet|yoga|fitness)/.test(lower)
     ) {
       try {
         const services = await this.prisma.microService.findMany({
           where: { isPaused: false, isDisabled: false },
-          include: { resident: { select: { flatNumber: true } } },
+          // Deliberately no resident include — keeps identity private
           take: 10,
         });
         if (services.length) {
           parts.push(
-            '<services>\n' +
-              services
-                .map(
-                  (s) =>
-                    `Name: ${s.name} | Category: ${s.category} | Flat: ${
-                      s.resident?.flatNumber ?? 'Admin'
-                    }${s.description ? ` | Info: ${s.description}` : ''}`,
-                )
-                .join('\n') +
-              '\n</services>',
+            '<resident_services>\n' +
+              services.map((s) =>
+                `Name: ${s.name} | Category: ${s.category}${s.description ? ` | Info: ${s.description}` : ''}`,
+              ).join('\n') +
+              '\n</resident_services>',
           );
+        }
+      } catch {}
+    }
+
+    // ── Carpool routes (destination + timing only; offerer identity hidden) ─
+    if (
+      /(carpool|ride|pool|lift|drop|pickup|commute|office|whitefield|koramangala|electronic|mg road|indiranagar)/.test(lower)
+    ) {
+      try {
+        const routes = await this.prisma.carpoolRoute.findMany({
+          where: { isPaused: false },
+          // No resident include — keeps offerer identity private
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        });
+        if (routes.length) {
+          parts.push(
+            '<carpool_routes>\n' +
+              routes.map((r) => {
+                const days = r.recurringDays?.length ? ` | Days: ${r.recurringDays.join(', ')}` : '';
+                const ret = r.hasReturn && r.returnTime ? ` | Return: ${r.returnTime}` : '';
+                return (
+                  `Destination: ${r.destinationAddress} | Departs: ${r.departureTime}` +
+                  ` | Seats: ${r.seatsAvailable} | Type: ${r.type}${days}${ret}`
+                );
+              }).join('\n') +
+              '\n</carpool_routes>',
+          );
+        }
+      } catch {}
+    }
+
+    // ── Lost & Found (descriptions + location only; reporter identity hidden) 
+    if (
+      /(lost|found|missing|item|belong|wallet|key|phone|bag|purse|jewel)/.test(lower)
+    ) {
+      try {
+        const [foundItems, lostItems] = await Promise.all([
+          this.prisma.foundItem.findMany({
+            where: { status: 'OPEN' },
+            // No reportedBy include — identity stays private
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+          }),
+          this.prisma.lostItem.findMany({
+            where: { status: 'OPEN' },
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+          }),
+        ]);
+
+        if (foundItems.length) {
+          parts.push(
+            '<found_items>\n' +
+              foundItems.map((f) =>
+                `Description: ${f.aiDescription || f.originalDescription} | Collection: ${f.collectionLocation}`,
+              ).join('\n') +
+              '\n</found_items>',
+          );
+        }
+        if (lostItems.length) {
+          parts.push(
+            '<lost_items>\n' +
+              lostItems.map((l) =>
+                `Description: ${l.aiDescription || l.originalDescription}`,
+              ).join('\n') +
+              '\n</lost_items>',
+          );
+        }
+      } catch {}
+    }
+
+    // ── Categories (worker + service types available in the society) ─────────
+    if (
+      /(what|which|any|available|category|categories|type|kind|offer|provide)/.test(lower)
+    ) {
+      try {
+        const categories = await this.prisma.category.findMany({
+          orderBy: { name: 'asc' },
+        });
+        if (categories.length) {
+          const workerCats = categories.filter((c) => c.type === 'worker').map((c) => c.name);
+          const serviceCats = categories.filter((c) => c.type === 'service').map((c) => c.name);
+          const lines: string[] = [];
+          if (workerCats.length) lines.push(`Worker categories: ${workerCats.join(', ')}`);
+          if (serviceCats.length) lines.push(`Service categories: ${serviceCats.join(', ')}`);
+          if (lines.length) parts.push('<categories>\n' + lines.join('\n') + '\n</categories>');
         }
       } catch {}
     }
